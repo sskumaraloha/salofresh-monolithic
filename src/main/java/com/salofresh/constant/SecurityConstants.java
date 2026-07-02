@@ -25,6 +25,8 @@ public final class SecurityConstants {
             "/files/**",
             "/api/v1/categories/**",
             "/api/v1/services/**",
-            "/api/v1/salons/*/services/**"
+            "/api/v1/salons/*/services/**",
+            "/api/v1/salons/*/reviews",
+            "/api/v1/employees/*/reviews"
     };
 }
