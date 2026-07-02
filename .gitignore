@@ -11,3 +11,5 @@ uploads/
 .DS_Store
 .env
 HELP.md
+
+.claude/worktrees/
