@@ -11,6 +11,8 @@ import com.salofresh.repository.WalletRepository;
 import com.salofresh.repository.WalletTransactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -90,6 +92,16 @@ public class WalletServiceImpl implements WalletService {
 
         eventPublisher.publishEvent(new WalletTransactionEvent(user, transaction));
         return transaction;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<WalletTransaction> getTransactionHistory(Long userId, Pageable pageable) {
+        Wallet wallet = walletRepository.findByUserId(userId).orElse(null);
+        if (wallet == null) {
+            return Page.empty(pageable);
+        }
+        return walletTransactionRepository.findAllByWalletIdOrderByCreatedAtDesc(wallet.getId(), pageable);
     }
 
     private void validateAmount(BigDecimal amount) {
