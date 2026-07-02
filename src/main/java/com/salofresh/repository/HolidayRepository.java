@@ -14,4 +14,6 @@ public interface HolidayRepository extends JpaRepository<Holiday, Long> {
     Optional<Holiday> findBySalonIdAndHolidayDate(Long salonId, LocalDate holidayDate);
 
     boolean existsBySalonIdAndHolidayDate(Long salonId, LocalDate holidayDate);
+
+    Optional<Holiday> findByIdAndSalonId(Long id, Long salonId);
 }
