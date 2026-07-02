@@ -22,6 +22,7 @@ public final class SecurityConstants {
             "/actuator/info",
             "/oauth2/**",
             "/login/oauth2/**",
-            "/files/**"
+            "/files/**",
+            "/api/v1/salons/*/slots"
     };
 }
