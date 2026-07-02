@@ -1,5 +1,6 @@
 package com.salofresh.repository;
 
+import com.salofresh.common.enums.EntityStatus;
 import com.salofresh.entity.SalonService;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -14,4 +15,6 @@ public interface SalonServiceRepository extends JpaRepository<SalonService, Long
     Optional<SalonService> findByIdAndSalonIdAndDeletedFalse(Long id, Long salonId);
 
     List<SalonService> findAllByCategoryIdAndDeletedFalse(Long categoryId);
+
+    List<SalonService> findAllBySalonIdAndStatusAndDeletedFalse(Long salonId, EntityStatus status);
 }
