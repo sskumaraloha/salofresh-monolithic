@@ -16,4 +16,6 @@ public interface SalonRepository extends JpaRepository<Salon, Long>, JpaSpecific
     boolean existsBySlug(String slug);
 
     long countByOwnerIdAndDeletedFalse(Long ownerId);
+
+    Optional<Salon> findByIdAndDeletedFalse(Long id);
 }
