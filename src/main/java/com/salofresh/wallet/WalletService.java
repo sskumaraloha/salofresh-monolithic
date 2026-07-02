@@ -4,6 +4,8 @@ import com.salofresh.common.enums.WalletTransactionSource;
 import com.salofresh.entity.User;
 import com.salofresh.entity.Wallet;
 import com.salofresh.entity.WalletTransaction;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 
@@ -18,4 +20,6 @@ public interface WalletService {
 
     WalletTransaction debit(User user, BigDecimal amount, WalletTransactionSource source,
                              String referenceId, String description);
+
+    Page<WalletTransaction> getTransactionHistory(Long userId, Pageable pageable);
 }
