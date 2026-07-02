@@ -1,0 +1,11 @@
+package com.salofresh.repository;
+
+import com.salofresh.entity.Refund;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface RefundRepository extends JpaRepository<Refund, Long> {
+
+    List<Refund> findAllByPaymentId(Long paymentId);
+}

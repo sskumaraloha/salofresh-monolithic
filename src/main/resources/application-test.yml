@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:salofresh_test;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    open-in-view: false
+  flyway:
+    enabled: false
+  mail:
+    host: localhost
+    port: 3025
+
+app:
+  jwt:
+    secret: dGVzdC1zZWNyZXQta2V5LWZvci1qd3Qtc2lnbmluZy1tdXN0LWJlLWxvbmctZW5vdWdoLTI1NmJpdA==
+    access-token-expiration-ms: 900000
+    refresh-token-expiration-ms: 604800000

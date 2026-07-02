@@ -1,0 +1,124 @@
+spring:
+  application:
+    name: salofresh-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 10MB
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
+  cache:
+    type: caffeine
+    cache-names: salons,services,categories,cities,states,countries,popularSalons,salonDetails
+    caffeine:
+      spec: maximumSize=2000,expireAfterWrite=15m
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:noreply@salofresh.com}
+    password: ${MAIL_PASSWORD:changeit}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+        transport:
+          protocol: smtp
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:google-client-secret}
+            scope:
+              - email
+              - profile
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+  error:
+    include-message: always
+    include-binding-errors: always
+
+app:
+  version: v1
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:4200}
+  jwt:
+    secret: ${JWT_SECRET:c2Fsb2ZyZXNoLXN1cGVyLXNlY3JldC1rZXktZm9yLWp3dC1zaWduaW5nLW11c3QtYmUtbG9uZy1lbm91Z2gtMjU2Yml0}
+    access-token-expiration-ms: ${JWT_ACCESS_EXPIRATION:900000}
+    refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION:604800000}
+    remember-me-refresh-token-expiration-ms: ${JWT_REMEMBER_ME_EXPIRATION:2592000000}
+    issuer: salofresh
+  otp:
+    length: 6
+    expiry-minutes: 10
+    max-attempts: 5
+    resend-cooldown-seconds: 60
+  security:
+    max-failed-login-attempts: 5
+    account-lock-duration-minutes: 30
+  file:
+    upload-dir: ${FILE_UPLOAD_DIR:./uploads}
+    max-size-bytes: 5242880
+    allowed-extensions: jpg,jpeg,png,pdf
+    base-url: ${FILE_BASE_URL:http://localhost:8080/files}
+  payment:
+    razorpay:
+      key-id: ${RAZORPAY_KEY_ID:rzp_test_key}
+      key-secret: ${RAZORPAY_KEY_SECRET:rzp_test_secret}
+    stripe:
+      secret-key: ${STRIPE_SECRET_KEY:sk_test_key}
+      publishable-key: ${STRIPE_PUBLISHABLE_KEY:pk_test_key}
+  sms:
+    provider: ${SMS_PROVIDER:console}
+    twilio:
+      account-sid: ${TWILIO_ACCOUNT_SID:}
+      auth-token: ${TWILIO_AUTH_TOKEN:}
+      from-number: ${TWILIO_FROM_NUMBER:}
+  rate-limit:
+    enabled: true
+    capacity: 20
+    refill-tokens: 20
+    refill-duration-seconds: 60
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+    disable-swagger-default-url: true
+  packages-to-scan: com.salofresh.controller
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    root: INFO
+    com.salofresh: DEBUG
+    org.hibernate.SQL: WARN
