@@ -30,6 +30,9 @@ public class ReviewResponse {
 
     private Integer salonRating;
     private Integer employeeRating;
+    private Integer cleanlinessRating;
+    private Integer serviceQualityRating;
+    private Integer valueForMoneyRating;
     private String comment;
 
     private List<String> images;

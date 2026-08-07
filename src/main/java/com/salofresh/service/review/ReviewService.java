@@ -4,6 +4,7 @@ import com.salofresh.dto.review.CreateReviewRequest;
 import com.salofresh.dto.review.OwnerReplyRequest;
 import com.salofresh.dto.review.ReportReviewRequest;
 import com.salofresh.dto.review.ReviewResponse;
+import com.salofresh.dto.review.SalonRatingBreakdownResponse;
 import com.salofresh.dto.review.UpdateReviewRequest;
 import com.salofresh.response.PagedResponse;
 import org.springframework.data.domain.Pageable;
@@ -55,4 +56,10 @@ public interface ReviewService {
      * Uploads and attaches an image to a review owned by the given customer.
      */
     ReviewResponse uploadImage(Long customerId, Long reviewId, MultipartFile file);
+
+    /**
+     * Public aggregate rating breakdown for a salon: overall rating plus the per-criteria
+     * (cleanliness, service quality, value-for-money) averages across its VISIBLE reviews.
+     */
+    SalonRatingBreakdownResponse getRatingBreakdown(Long salonId);
 }

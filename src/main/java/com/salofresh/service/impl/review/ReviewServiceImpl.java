@@ -6,6 +6,7 @@ import com.salofresh.dto.review.CreateReviewRequest;
 import com.salofresh.dto.review.OwnerReplyRequest;
 import com.salofresh.dto.review.ReportReviewRequest;
 import com.salofresh.dto.review.ReviewResponse;
+import com.salofresh.dto.review.SalonRatingBreakdownResponse;
 import com.salofresh.dto.review.UpdateReviewRequest;
 import com.salofresh.entity.Appointment;
 import com.salofresh.entity.Employee;
@@ -79,6 +80,10 @@ public class ReviewServiceImpl implements ReviewService {
             throw new BadRequestException("This appointment had no assigned employee to rate");
         }
 
+        validateSubRating(request.getCleanlinessRating(), "Cleanliness rating");
+        validateSubRating(request.getServiceQualityRating(), "Service quality rating");
+        validateSubRating(request.getValueForMoneyRating(), "Value for money rating");
+
         Review review = Review.builder()
                 .customer(appointment.getCustomer())
                 .salon(appointment.getSalon())
@@ -86,6 +91,9 @@ public class ReviewServiceImpl implements ReviewService {
                 .appointment(appointment)
                 .salonRating(request.getSalonRating())
                 .employeeRating(employee != null ? employeeRating : null)
+                .cleanlinessRating(request.getCleanlinessRating())
+                .serviceQualityRating(request.getServiceQualityRating())
+                .valueForMoneyRating(request.getValueForMoneyRating())
                 .comment(request.getComment())
                 .status(ReviewStatus.VISIBLE)
                 .build();
@@ -114,8 +122,15 @@ public class ReviewServiceImpl implements ReviewService {
             throw new BadRequestException("This review has no associated employee to rate");
         }
 
+        validateSubRating(request.getCleanlinessRating(), "Cleanliness rating");
+        validateSubRating(request.getServiceQualityRating(), "Service quality rating");
+        validateSubRating(request.getValueForMoneyRating(), "Value for money rating");
+
         review.setSalonRating(request.getSalonRating());
         review.setEmployeeRating(review.getEmployee() != null ? employeeRating : null);
+        review.setCleanlinessRating(request.getCleanlinessRating());
+        review.setServiceQualityRating(request.getServiceQualityRating());
+        review.setValueForMoneyRating(request.getValueForMoneyRating());
         review.setComment(request.getComment());
         review = reviewRepository.save(review);
 
@@ -213,6 +228,33 @@ public class ReviewServiceImpl implements ReviewService {
                 .build());
 
         return toResponse(review);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SalonRatingBreakdownResponse getRatingBreakdown(Long salonId) {
+        salonRepository.findById(salonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Salon", "id", salonId));
+
+        Double overallRating = reviewRepository.averageSalonRating(salonId, ReviewStatus.VISIBLE);
+        long totalReviews = reviewRepository.countBySalonIdAndStatus(salonId, ReviewStatus.VISIBLE);
+        Double cleanlinessRating = reviewRepository.averageCleanlinessRating(salonId, ReviewStatus.VISIBLE);
+        Double serviceQualityRating = reviewRepository.averageServiceQualityRating(salonId, ReviewStatus.VISIBLE);
+        Double valueForMoneyRating = reviewRepository.averageValueForMoneyRating(salonId, ReviewStatus.VISIBLE);
+
+        return SalonRatingBreakdownResponse.builder()
+                .overallRating(overallRating)
+                .cleanlinessRating(cleanlinessRating)
+                .serviceQualityRating(serviceQualityRating)
+                .valueForMoneyRating(valueForMoneyRating)
+                .totalReviews(totalReviews)
+                .build();
+    }
+
+    private void validateSubRating(Integer rating, String label) {
+        if (rating != null && (rating < 1 || rating > 5)) {
+            throw new BadRequestException(label + " must be between 1 and 5");
+        }
     }
 
     private Review getActiveReview(Long reviewId) {

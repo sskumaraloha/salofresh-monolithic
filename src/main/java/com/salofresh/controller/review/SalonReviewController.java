@@ -2,6 +2,7 @@ package com.salofresh.controller.review;
 
 import com.salofresh.constant.AppConstants;
 import com.salofresh.dto.review.ReviewResponse;
+import com.salofresh.dto.review.SalonRatingBreakdownResponse;
 import com.salofresh.response.ApiResponse;
 import com.salofresh.response.PagedResponse;
 import com.salofresh.service.review.ReviewService;
@@ -32,5 +33,13 @@ public class SalonReviewController {
             @PathVariable Long salonId, @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Reviews fetched successfully",
                 reviewService.listForSalon(salonId, pageable)));
+    }
+
+    @GetMapping("/rating-breakdown")
+    @PreAuthorize("permitAll()")
+    @Operation(summary = "Get the aggregate multi-criteria rating breakdown for a salon")
+    public ResponseEntity<ApiResponse<SalonRatingBreakdownResponse>> ratingBreakdown(@PathVariable Long salonId) {
+        return ResponseEntity.ok(ApiResponse.success("Rating breakdown fetched successfully",
+                reviewService.getRatingBreakdown(salonId)));
     }
 }
