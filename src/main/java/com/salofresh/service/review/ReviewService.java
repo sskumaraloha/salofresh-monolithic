@@ -1,5 +1,6 @@
 package com.salofresh.service.review;
 
+import com.salofresh.dto.admin.ModerateReviewRequest;
 import com.salofresh.dto.review.CreateReviewRequest;
 import com.salofresh.dto.review.OwnerReplyRequest;
 import com.salofresh.dto.review.ReportReviewRequest;
@@ -62,4 +63,10 @@ public interface ReviewService {
      * (cleanliness, service quality, value-for-money) averages across its VISIBLE reviews.
      */
     SalonRatingBreakdownResponse getRatingBreakdown(Long salonId);
+
+    /**
+     * Admin moderation action: sets a review's status (e.g. hides or restores it) and records
+     * the change in the audit trail.
+     */
+    ReviewResponse moderate(Long adminUserId, Long reviewId, ModerateReviewRequest request);
 }

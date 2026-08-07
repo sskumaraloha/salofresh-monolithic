@@ -23,6 +23,10 @@ public interface ReviewRepository extends JpaRepository<Review, Long>, JpaSpecif
 
     boolean existsByAppointmentId(Long appointmentId);
 
+    Page<Review> findAllByStatusOrderByCreatedAtDesc(ReviewStatus status, Pageable pageable);
+
+    Page<Review> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
     @Query("select avg(r.salonRating) from Review r where r.salon.id = :salonId and r.status = :status and r.deleted = false")
     Double averageSalonRating(@Param("salonId") Long salonId, @Param("status") ReviewStatus status);
 
