@@ -27,15 +27,20 @@ import com.salofresh.event.SalonSuspendedEvent;
 import com.salofresh.event.UserRegisteredEvent;
 import com.salofresh.event.WalletTransactionEvent;
 import com.salofresh.notification.NotificationService;
+import com.salofresh.push.PushNotificationService;
 import com.salofresh.sms.SmsService;
+import com.salofresh.whatsapp.WhatsAppService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.stereotype.Component;
 
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class NotificationEventListener {
@@ -43,6 +48,8 @@ public class NotificationEventListener {
     private final NotificationService notificationService;
     private final EmailService emailService;
     private final SmsService smsService;
+    private final PushNotificationService pushNotificationService;
+    private final WhatsAppService whatsAppService;
     private final EmailTemplateBuilder emailTemplateBuilder;
 
     @Async("taskExecutor")
@@ -91,6 +98,11 @@ public class NotificationEventListener {
                         appointment.getSalon().getName(),
                         appointment.getAppointmentDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
                         appointment.getStartTime().toString()));
+        safePush(() -> pushNotificationService.sendToUser(customer, "Booking Confirmation", message,
+                Map.of("type", "BOOKING_CONFIRMATION", "appointmentId", appointment.getId().toString())));
+        if (customer.getPhone() != null) {
+            safePush(() -> whatsAppService.sendMessage(customer.getPhone(), message));
+        }
     }
 
     @Async("taskExecutor")
@@ -107,10 +119,12 @@ public class NotificationEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onBookingCancelled(BookingCancelledEvent event) {
         Appointment appointment = event.appointment();
+        String message = "Your booking %s has been cancelled.".formatted(appointment.getBookingNumber());
         notificationService.createAndDispatch(appointment.getCustomer(), NotificationType.BOOKING_CANCELLED,
-                NotificationChannel.EMAIL, "Booking Cancelled",
-                "Your booking %s has been cancelled.".formatted(appointment.getBookingNumber()),
+                NotificationChannel.EMAIL, "Booking Cancelled", message,
                 appointment.getId().toString(), "APPOINTMENT");
+        safePush(() -> pushNotificationService.sendToUser(appointment.getCustomer(), "Booking Cancelled", message,
+                Map.of("type", "BOOKING_CANCELLED", "appointmentId", appointment.getId().toString())));
     }
 
     @Async("taskExecutor")
@@ -147,24 +161,37 @@ public class NotificationEventListener {
                     "Reminder: your SaloFresh appointment at %s is today at %s.".formatted(
                             appointment.getSalon().getName(), appointment.getStartTime()));
         }
+        String reminderMessage = "Reminder: you have an appointment at %s on %s at %s.".formatted(
+                appointment.getSalon().getName(), appointment.getAppointmentDate(), appointment.getStartTime());
+        safePush(() -> pushNotificationService.sendToUser(appointment.getCustomer(), "Booking Reminder", reminderMessage,
+                Map.of("type", "BOOKING_REMINDER", "appointmentId", appointment.getId().toString())));
+        if (appointment.getCustomer().getPhone() != null) {
+            safePush(() -> whatsAppService.sendMessage(appointment.getCustomer().getPhone(), reminderMessage));
+        }
     }
 
     @Async("taskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onPaymentSuccess(PaymentSuccessEvent event) {
         Payment payment = event.payment();
+        String message = "Your payment of %s %s was successful.".formatted(payment.getCurrency(), payment.getAmount());
         notificationService.createAndDispatch(payment.getUser(), NotificationType.PAYMENT_SUCCESS, NotificationChannel.EMAIL,
-                "Payment Successful", "Your payment of %s %s was successful.".formatted(payment.getCurrency(), payment.getAmount()),
+                "Payment Successful", message,
                 payment.getId().toString(), "PAYMENT");
+        safePush(() -> pushNotificationService.sendToUser(payment.getUser(), "Payment Successful", message,
+                Map.of("type", "PAYMENT_SUCCESS", "paymentId", payment.getId().toString())));
     }
 
     @Async("taskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onPaymentFailed(PaymentFailedEvent event) {
         Payment payment = event.payment();
+        String message = "Your payment of %s %s could not be processed.".formatted(payment.getCurrency(), payment.getAmount());
         notificationService.createAndDispatch(payment.getUser(), NotificationType.PAYMENT_FAILED, NotificationChannel.EMAIL,
-                "Payment Failed", "Your payment of %s %s could not be processed.".formatted(payment.getCurrency(), payment.getAmount()),
+                "Payment Failed", message,
                 payment.getId().toString(), "PAYMENT");
+        safePush(() -> pushNotificationService.sendToUser(payment.getUser(), "Payment Failed", message,
+                Map.of("type", "PAYMENT_FAILED", "paymentId", payment.getId().toString())));
     }
 
     @Async("taskExecutor")
@@ -212,10 +239,13 @@ public class NotificationEventListener {
     public void onNewReview(NewReviewEvent event) {
         var review = event.review();
         User owner = review.getSalon().getOwner().getUser();
+        String message = "%s left a %d-star review for %s.".formatted(review.getCustomer().getFullName(),
+                review.getSalonRating(), review.getSalon().getName());
         notificationService.createAndDispatch(owner, NotificationType.NEW_REVIEW, NotificationChannel.IN_APP,
-                "New Review", "%s left a %d-star review for %s.".formatted(review.getCustomer().getFullName(),
-                        review.getSalonRating(), review.getSalon().getName()),
+                "New Review", message,
                 review.getId().toString(), "REVIEW");
+        safePush(() -> pushNotificationService.sendToUser(owner, "New Review", message,
+                Map.of("type", "NEW_REVIEW", "reviewId", review.getId().toString())));
     }
 
     @Async("taskExecutor")
@@ -247,5 +277,19 @@ public class NotificationEventListener {
         notificationService.createAndDispatch(event.user(), NotificationType.REWARD_POINTS_EARNED, NotificationChannel.IN_APP,
                 "Reward Points Earned", "You earned %d reward points. New balance: %d points".formatted(rp.getPoints(), rp.getBalanceAfter()),
                 rp.getId().toString(), "REWARD_POINT");
+    }
+
+    /**
+     * Runs a best-effort push/WhatsApp delivery, swallowing and logging any exception so that a
+     * misbehaving or unconfigured provider never breaks the surrounding event handler. The
+     * underlying push/WhatsApp services already catch their own delivery failures internally;
+     * this is an extra safety net around argument evaluation (e.g. unexpected nulls).
+     */
+    private void safePush(Runnable action) {
+        try {
+            action.run();
+        } catch (Exception ex) {
+            log.error("Best-effort push/WhatsApp dispatch failed", ex);
+        }
     }
 }
