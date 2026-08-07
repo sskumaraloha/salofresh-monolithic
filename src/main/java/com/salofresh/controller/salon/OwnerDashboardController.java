@@ -1,6 +1,7 @@
 package com.salofresh.controller.salon;
 
 import com.salofresh.constant.AppConstants;
+import com.salofresh.dto.salon.BranchComparisonResponse;
 import com.salofresh.dto.salon.OwnerDashboardResponse;
 import com.salofresh.response.ApiResponse;
 import com.salofresh.service.salon.OwnerDashboardService;
@@ -26,5 +27,12 @@ public class OwnerDashboardController {
     @Operation(summary = "Get the dashboard summary for the authenticated salon owner")
     public ResponseEntity<ApiResponse<OwnerDashboardResponse>> getDashboard() {
         return ResponseEntity.ok(ApiResponse.success("Dashboard fetched successfully", ownerDashboardService.getDashboard()));
+    }
+
+    @GetMapping("/branches")
+    @Operation(summary = "Compare performance across all branches owned by the authenticated salon owner")
+    public ResponseEntity<ApiResponse<BranchComparisonResponse>> getBranchComparison() {
+        return ResponseEntity.ok(ApiResponse.success("Branch comparison fetched successfully",
+                ownerDashboardService.getBranchComparison()));
     }
 }
