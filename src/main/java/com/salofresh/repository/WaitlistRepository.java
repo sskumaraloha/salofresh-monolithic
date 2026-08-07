@@ -19,4 +19,6 @@ public interface WaitlistRepository extends JpaRepository<Waitlist, Long> {
     List<Waitlist> findAllBySalonIdAndPreferredDateAndStatus(Long salonId, LocalDate preferredDate, WaitlistStatus status);
 
     List<Waitlist> findAllByEmployeeIdAndPreferredDateAndStatus(Long employeeId, LocalDate preferredDate, WaitlistStatus status);
+
+    List<Waitlist> findAllByStatusAndPreferredDateBefore(WaitlistStatus status, LocalDate preferredDate);
 }
