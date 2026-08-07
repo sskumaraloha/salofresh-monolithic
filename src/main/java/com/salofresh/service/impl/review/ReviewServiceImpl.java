@@ -2,6 +2,7 @@ package com.salofresh.service.impl.review;
 
 import com.salofresh.common.enums.BookingStatus;
 import com.salofresh.common.enums.ReviewStatus;
+import com.salofresh.dto.admin.ModerateReviewRequest;
 import com.salofresh.dto.review.CreateReviewRequest;
 import com.salofresh.dto.review.OwnerReplyRequest;
 import com.salofresh.dto.review.ReportReviewRequest;
@@ -9,6 +10,7 @@ import com.salofresh.dto.review.ReviewResponse;
 import com.salofresh.dto.review.SalonRatingBreakdownResponse;
 import com.salofresh.dto.review.UpdateReviewRequest;
 import com.salofresh.entity.Appointment;
+import com.salofresh.entity.AuditLog;
 import com.salofresh.entity.Employee;
 import com.salofresh.entity.Review;
 import com.salofresh.entity.ReviewImage;
@@ -21,6 +23,7 @@ import com.salofresh.exception.ResourceNotFoundException;
 import com.salofresh.file.FileStorageService;
 import com.salofresh.mapper.review.ReviewMapper;
 import com.salofresh.repository.AppointmentRepository;
+import com.salofresh.repository.AuditLogRepository;
 import com.salofresh.repository.EmployeeRepository;
 import com.salofresh.repository.ReviewImageRepository;
 import com.salofresh.repository.ReviewRepository;
@@ -57,6 +60,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewMapper reviewMapper;
     private final FileStorageService fileStorageService;
     private final ApplicationEventPublisher eventPublisher;
+    private final AuditLogRepository auditLogRepository;
 
     @Override
     @Transactional
@@ -249,6 +253,29 @@ public class ReviewServiceImpl implements ReviewService {
                 .valueForMoneyRating(valueForMoneyRating)
                 .totalReviews(totalReviews)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public ReviewResponse moderate(Long adminUserId, Long reviewId, ModerateReviewRequest request) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review", "id", reviewId));
+
+        ReviewStatus oldStatus = review.getStatus();
+        review.setStatus(request.getStatus());
+        review = reviewRepository.save(review);
+
+        auditLogRepository.save(AuditLog.builder()
+                .entityName("Review")
+                .entityId(reviewId.toString())
+                .action("MODERATE")
+                .performedBy(adminUserId.toString())
+                .oldValue(oldStatus.name())
+                .newValue(request.getStatus().name())
+                .performedAt(Instant.now())
+                .build());
+
+        return toResponse(review);
     }
 
     private void validateSubRating(Integer rating, String label) {

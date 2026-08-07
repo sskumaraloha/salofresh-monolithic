@@ -8,4 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 
     Page<AuditLog> findAllByEntityNameOrderByPerformedAtDesc(String entityName, Pageable pageable);
+
+    Page<AuditLog> findAllByOrderByPerformedAtDesc(Pageable pageable);
+
+    Page<AuditLog> findAllByEntityNameAndActionOrderByPerformedAtDesc(String entityName, String action, Pageable pageable);
 }
