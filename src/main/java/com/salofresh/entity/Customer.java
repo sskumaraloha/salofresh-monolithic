@@ -54,4 +54,7 @@ public class Customer extends Auditable {
 
     @Column(name = "preferred_salon_id")
     private Long preferredSalonId;
+
+    @Column(name = "preferred_employee_id")
+    private Long preferredEmployeeId;
 }

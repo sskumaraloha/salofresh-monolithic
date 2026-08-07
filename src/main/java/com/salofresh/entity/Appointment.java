@@ -32,7 +32,7 @@ import java.time.LocalTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(callSuper = true, exclude = {"customer", "salon", "employee"})
+@ToString(callSuper = true, exclude = {"customer", "salon", "employee", "familyMember", "membershipSubscription"})
 public class Appointment extends Auditable {
 
     @Id
@@ -53,6 +53,14 @@ public class Appointment extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id")
     private Employee employee;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "family_member_id")
+    private FamilyMember familyMember;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "membership_subscription_id")
+    private MembershipSubscription membershipSubscription;
 
     @Column(name = "appointment_date", nullable = false)
     private LocalDate appointmentDate;

@@ -1,7 +1,7 @@
 package com.salofresh.entity;
 
 import com.salofresh.audit.Auditable;
-import com.salofresh.common.enums.ReviewStatus;
+import com.salofresh.common.enums.WaitlistStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -21,24 +21,26 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 @Entity
-@Table(name = "reviews")
+@Table(name = "waitlist")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(callSuper = true, exclude = {"customer", "salon", "employee", "appointment"})
-public class Review extends Auditable {
+@ToString(callSuper = true, exclude = {"user", "salon", "employee", "service"})
+public class Waitlist extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_id", nullable = false)
-    private User customer;
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "salon_id", nullable = false)
@@ -49,38 +51,23 @@ public class Review extends Auditable {
     private Employee employee;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "appointment_id")
-    private Appointment appointment;
+    @JoinColumn(name = "service_id")
+    private SalonService service;
 
-    @Column(name = "salon_rating", nullable = false)
-    private int salonRating;
+    @Column(name = "preferred_date", nullable = false)
+    private LocalDate preferredDate;
 
-    @Column(name = "employee_rating")
-    private Integer employeeRating;
+    @Column(name = "preferred_start_time")
+    private LocalTime preferredStartTime;
 
-    @Column(name = "cleanliness_rating")
-    private Integer cleanlinessRating;
-
-    @Column(name = "service_quality_rating")
-    private Integer serviceQualityRating;
-
-    @Column(name = "value_for_money_rating")
-    private Integer valueForMoneyRating;
-
-    @Column(length = 2000)
-    private String comment;
-
-    @Column(name = "owner_reply", length = 2000)
-    private String ownerReply;
-
-    @Column(name = "owner_reply_at")
-    private Instant ownerReplyAt;
+    @Column(name = "preferred_end_time")
+    private LocalTime preferredEndTime;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private ReviewStatus status = ReviewStatus.VISIBLE;
+    private WaitlistStatus status = WaitlistStatus.WAITING;
 
-    @Column(name = "report_reason", length = 500)
-    private String reportReason;
+    @Column(name = "notified_at")
+    private Instant notifiedAt;
 }
