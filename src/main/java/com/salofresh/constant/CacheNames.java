@@ -13,4 +13,5 @@ public final class CacheNames {
     public static final String STATES = "states";
     public static final String COUNTRIES = "countries";
     public static final String POPULAR_SALONS = "popularSalons";
+    public static final String FEATURE_FLAGS = "featureFlags";
 }

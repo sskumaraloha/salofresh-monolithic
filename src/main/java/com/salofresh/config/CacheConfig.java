@@ -22,7 +22,8 @@ public class CacheConfig {
                 CacheNames.CITIES,
                 CacheNames.STATES,
                 CacheNames.COUNTRIES,
-                CacheNames.POPULAR_SALONS
+                CacheNames.POPULAR_SALONS,
+                CacheNames.FEATURE_FLAGS
         );
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(15, TimeUnit.MINUTES)
