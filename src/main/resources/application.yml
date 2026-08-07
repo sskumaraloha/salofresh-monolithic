@@ -108,6 +108,9 @@ app:
     capacity: 20
     refill-tokens: 20
     refill-duration-seconds: 60
+  payout:
+    # Applied when generating a payout for a salon owner with no active PlatformSubscription plan.
+    default-commission-percentage: ${PAYOUT_DEFAULT_COMMISSION_PERCENTAGE:10.0}
 
 springdoc:
   api-docs:
