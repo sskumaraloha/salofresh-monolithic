@@ -34,6 +34,7 @@ public final class SecurityConstants {
             "/api/v1/salons/*/slots",
             "/api/v1/salons",
             "/api/v1/salons/*",
-            "/api/v1/locations/**"
+            "/api/v1/locations/**",
+            "/ws/**"
     };
 }
