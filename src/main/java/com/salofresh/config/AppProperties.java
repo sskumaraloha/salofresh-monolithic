@@ -5,6 +5,7 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Getter
@@ -25,6 +26,7 @@ public class AppProperties {
     private final Push push = new Push();
     private final Whatsapp whatsapp = new Whatsapp();
     private final RateLimit rateLimit = new RateLimit();
+    private final Payout payout = new Payout();
 
     @Getter
     @Setter
@@ -152,5 +154,16 @@ public class AppProperties {
         private int capacity;
         private int refillTokens;
         private int refillDurationSeconds;
+    }
+
+    /**
+     * Fallback platform commission percentage used when generating a salon payout for a
+     * salon owner who has no active {@code PlatformSubscription} (or when that module is
+     * unavailable), applied in place of the subscription plan's commission percentage.
+     */
+    @Getter
+    @Setter
+    public static class Payout {
+        private BigDecimal defaultCommissionPercentage = new BigDecimal("10.0");
     }
 }
