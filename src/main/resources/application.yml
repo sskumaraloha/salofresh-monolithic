@@ -19,7 +19,7 @@ spring:
         max-page-size: 100
   cache:
     type: caffeine
-    cache-names: salons,services,categories,cities,states,countries,popularSalons,salonDetails
+    cache-names: salons,services,categories,cities,states,countries,popularSalons,salonDetails,featureFlags
     caffeine:
       spec: maximumSize=2000,expireAfterWrite=15m
   mail:
