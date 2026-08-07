@@ -39,6 +39,7 @@ public final class SecurityConstants {
             "/api/v1/guest/**",
             "/api/v1/gift-cards/*/balance",
             "/api/v1/platform-billing/plans",
-            "/ws/**"
+            "/ws/**",
+            "/api/v1/webhooks/**"
     };
 }

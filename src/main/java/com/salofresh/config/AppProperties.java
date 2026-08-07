@@ -80,6 +80,7 @@ public class AppProperties {
         public static class Razorpay {
             private String keyId;
             private String keySecret;
+            private String webhookSecret;
         }
 
         @Getter
@@ -87,6 +88,7 @@ public class AppProperties {
         public static class Stripe {
             private String secretKey;
             private String publishableKey;
+            private String webhookSecret;
         }
     }
 
