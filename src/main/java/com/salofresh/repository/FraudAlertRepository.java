@@ -1,5 +1,6 @@
 package com.salofresh.repository;
 
+import com.salofresh.common.enums.FraudAlertSeverity;
 import com.salofresh.common.enums.FraudAlertStatus;
 import com.salofresh.entity.FraudAlert;
 import org.springframework.data.domain.Page;
@@ -14,4 +15,6 @@ public interface FraudAlertRepository extends JpaRepository<FraudAlert, Long> {
 
     boolean existsByRelatedUserIdAndTypeAndStatus(Long relatedUserId, com.salofresh.common.enums.FraudAlertType type,
                                                    FraudAlertStatus status);
+
+    Page<FraudAlert> findAllBySeverityOrderByDetectedAtDesc(FraudAlertSeverity severity, Pageable pageable);
 }

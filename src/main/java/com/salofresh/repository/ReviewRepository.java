@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 public interface ReviewRepository extends JpaRepository<Review, Long>, JpaSpecificationExecutor<Review> {
@@ -48,4 +50,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long>, JpaSpecif
     @Query("select avg(r.valueForMoneyRating) from Review r where r.salon.id = :salonId and r.valueForMoneyRating is not null "
             + "and r.status = :status and r.deleted = false")
     Double averageValueForMoneyRating(@Param("salonId") Long salonId, @Param("status") ReviewStatus status);
+
+    // Added for fraud/anomaly detection: fetch recent max-rating reviews to group by customer in
+    // memory when looking for "review bombing" patterns.
+    List<Review> findAllBySalonRatingAndCreatedAtAfterAndDeletedFalse(int salonRating, Instant after);
 }
