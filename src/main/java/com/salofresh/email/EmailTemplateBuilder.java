@@ -56,6 +56,21 @@ public class EmailTemplateBuilder {
                 """.formatted(title, recipientName, message);
     }
 
+    public String buildMarketingEmail(String recipientName, String title, String message) {
+        String greetingName = recipientName == null || recipientName.isBlank() ? "there" : recipientName;
+        return """
+                <html>
+                <body style="font-family:Arial,sans-serif;">
+                  <h2>%s</h2>
+                  <p>Hi %s,</p>
+                  <p>%s</p>
+                  <p style="font-size:12px;color:#888;">You're receiving this because you're a valued customer of a salon on SaloFresh.</p>
+                  <p>Regards,<br/>Team SaloFresh</p>
+                </body>
+                </html>
+                """.formatted(title, greetingName, message);
+    }
+
     public String buildGiftCardEmail(String recipientName, String code, BigDecimal amount, String message,
                                       LocalDate expiryDate) {
         String greetingName = recipientName == null || recipientName.isBlank() ? "there" : recipientName;
