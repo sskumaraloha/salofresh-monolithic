@@ -167,6 +167,13 @@
             <artifactId>core</artifactId>
             <version>3.5.3</version>
         </dependency>
+        <!-- Google OAuth2 client used to mint bearer tokens for the Firebase Cloud Messaging HTTP v1 API
+             from a service-account JSON credential (see com.salofresh.push.FirebaseCloudMessagingServiceImpl) -->
+        <dependency>
+            <groupId>com.google.auth</groupId>
+            <artifactId>google-auth-library-oauth2-http</artifactId>
+            <version>1.50.0</version>
+        </dependency>
 
         <!-- Test -->
         <dependency>

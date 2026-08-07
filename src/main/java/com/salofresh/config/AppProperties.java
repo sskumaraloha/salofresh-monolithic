@@ -22,6 +22,8 @@ public class AppProperties {
     private final File file = new File();
     private final Payment payment = new Payment();
     private final Sms sms = new Sms();
+    private final Push push = new Push();
+    private final Whatsapp whatsapp = new Whatsapp();
     private final RateLimit rateLimit = new RateLimit();
 
     @Getter
@@ -98,6 +100,48 @@ public class AppProperties {
             private String accountSid;
             private String authToken;
             private String fromNumber;
+        }
+    }
+
+    /**
+     * Push notification configuration. Delivery uses the Firebase Cloud Messaging HTTP v1 API
+     * ({@code https://fcm.googleapis.com/v1/projects/{projectId}/messages:send}), which requires an
+     * OAuth2 bearer token minted from a Google service-account credential rather than a static server key.
+     */
+    @Getter
+    @Setter
+    public static class Push {
+        private final Fcm fcm = new Fcm();
+
+        @Getter
+        @Setter
+        public static class Fcm {
+            /** GCP/Firebase project id that owns the messaging service account. */
+            private String projectId;
+            /**
+             * The service-account credential used to obtain FCM OAuth2 access tokens. May be either:
+             * <ul>
+             *     <li>the raw JSON content of the service-account key (starts with '{'), or</li>
+             *     <li>a filesystem path to the service-account JSON key file.</li>
+             * </ul>
+             * Left blank in default/dev configuration; push sends are skipped (logged and swallowed)
+             * until this is configured.
+             */
+            private String serviceAccountJson;
+        }
+    }
+
+    @Getter
+    @Setter
+    public static class Whatsapp {
+        private String provider;
+        private final Meta meta = new Meta();
+
+        @Getter
+        @Setter
+        public static class Meta {
+            private String accessToken;
+            private String phoneNumberId;
         }
     }
 
