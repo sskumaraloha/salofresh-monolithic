@@ -1,0 +1,3492 @@
+{
+  "info": {
+    "name": "SaloFresh \u2014 Customer Journey",
+    "_postman_id": "b6f2f8b0-0a5a-4f3e-9d1a-sf-customer-journey",
+    "description": "End-to-end Postman collection covering the complete SaloFresh customer/user journey, in the order a real customer would move through the app:\n\n1. Auth \u2014 register, verify OTP, login (captures tokens), refresh, profile check, password flows\n2. Profile & Preferences \u2014 profile, addresses, device tokens, preferred stylist\n3. Discover Salons \u2014 categories, locations, salon search/detail, services, employees, reviews, favorites, recently viewed\n4. Slots & Booking \u2014 availability, coupon preview, create/list/detail/reschedule/cancel booking\n5. Payments & Wallet \u2014 initiate/confirm payment, invoices, wallet balance/top-up/history, reward points\n6. Reviews \u2014 multi-criteria review create/list/update/report\n7. Memberships & Gift Cards \u2014 plans, purchase + confirm, subscriptions, gift card purchase/balance/redeem\n8. Family & Waitlist \u2014 family member CRUD, join/list/leave waitlist\n9. Chat & Support \u2014 support conversations/messages, support ticket lifecycle\n10. Privacy & Misc \u2014 GDPR data requests, feature flags, calendar export, guest booking, and logout (always last)\n\nAll requests target {{baseUrl}}/api/v1/... Run '01 Auth > Login' first (or let the collection runner execute folders top-to-bottom) so {{accessToken}} is populated for the bearer-auth requests that follow.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "salonId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "salonSlug",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "serviceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "employeeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "addressId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bookingId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bookingNumber",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "paymentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "conversationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "giftCardCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "membershipPlanId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subscriptionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "familyMemberId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ticketId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "couponCode",
+      "value": "WELCOME10",
+      "type": "string"
+    },
+    {
+      "key": "waitlistId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dataRequestId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "guestBookingNumber",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Auth",
+      "item": [
+        {
+          "name": "Register Customer",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register/customer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register",
+                "customer"
+              ]
+            },
+            "description": "Register a new customer account (public, no role required). Creates the account; an email/phone verification OTP is sent.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"priya.sharma+{{$timestamp}}@example.com\",\n  \"phone\": \"9876543210\",\n  \"password\": \"Passw0rd!23\",\n  \"firstName\": \"Priya\",\n  \"lastName\": \"Sharma\",\n  \"referralCode\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('customer registered', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.id) { pm.collectionVariables.set('customerUserId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP (Registration)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verify-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "verify-otp"
+              ]
+            },
+            "description": "Verify the registration OTP for email/phone verification (public). In a real environment, use the OTP delivered via email/SMS instead of this placeholder value.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"priya.sharma@example.com\",\n  \"otpType\": \"REGISTRATION\",\n  \"otp\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Resend OTP",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/resend-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "resend-otp"
+              ]
+            },
+            "description": "Resend a verification OTP to the given identifier (public).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"priya.sharma@example.com\",\n  \"otpType\": \"REGISTRATION\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login with email/phone + password (public). Captures accessToken/refreshToken used by the rest of the collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"priya.sharma@example.com\",\n  \"password\": \"Passw0rd!23\",\n  \"rememberMe\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('login ok', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', d.refreshToken);",
+                  "if (d.user && d.user.id) { pm.collectionVariables.set('customerUserId', d.user.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh-token"
+              ]
+            },
+            "description": "Rotate the refresh token and issue a new access/refresh token pair (public).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('refresh ok', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', d.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Current User (Me)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Get the currently authenticated user's account summary. Requires any authenticated role."
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Request an OTP to reset a forgotten password (public).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"priya.sharma@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Reset password using a verified OTP (public).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"priya.sharma@example.com\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewPassw0rd!23\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Change password for the currently authenticated customer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Passw0rd!23\",\n  \"newPassword\": \"Passw0rd!24\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Registration, OTP verification, login and token lifecycle. Login captures accessToken/refreshToken used by every later request. Logout / Logout-All deliberately live at the very end of '10 Privacy & Misc' so tokens stay valid while the rest of the journey runs."
+    },
+    {
+      "name": "02 Profile & Preferences",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Get the current customer's full profile (wallet balance, membership level, totals). Requires authenticated user."
+          }
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Update the current customer's profile fields. Requires authenticated user.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Priya\",\n  \"lastName\": \"Sharma\",\n  \"gender\": \"FEMALE\",\n  \"dateOfBirth\": \"1995-06-20\",\n  \"phone\": \"9876543210\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Upload Profile Image",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/profile-image",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "profile-image"
+              ]
+            },
+            "description": "Upload/replace the current customer's profile picture (multipart). Requires authenticated user.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "Image file (jpg/png)"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List My Addresses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/addresses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "addresses"
+              ]
+            },
+            "description": "List the current customer's saved addresses. Requires authenticated user."
+          }
+        },
+        {
+          "name": "Add Address",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/addresses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "addresses"
+              ]
+            },
+            "description": "Add a new saved address for the current customer. Requires authenticated user.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addressType\": \"HOME\",\n  \"addressLine1\": \"221B, Residency Road\",\n  \"addressLine2\": \"Near Brigade Road\",\n  \"landmark\": \"Opposite City Mall\",\n  \"cityId\": 1,\n  \"pinCode\": \"560025\",\n  \"latitude\": 12.9716,\n  \"longitude\": 77.5946,\n  \"isDefault\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('address created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.id) { pm.collectionVariables.set('addressId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Address",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/addresses/{{addressId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "addresses",
+                "{{addressId}}"
+              ]
+            },
+            "description": "Update an existing saved address owned by the current customer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addressType\": \"WORK\",\n  \"addressLine1\": \"5th Floor, Tech Park\",\n  \"addressLine2\": \"Outer Ring Road\",\n  \"landmark\": \"Next to Metro Station\",\n  \"cityId\": 1,\n  \"pinCode\": \"560103\",\n  \"latitude\": 12.9352,\n  \"longitude\": 77.6146,\n  \"isDefault\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Set Default Address",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/addresses/{{addressId}}/default",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "addresses",
+                "{{addressId}}",
+                "default"
+              ]
+            },
+            "description": "Mark a saved address as the default address for the current customer."
+          }
+        },
+        {
+          "name": "Delete Address",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/addresses/{{addressId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "addresses",
+                "{{addressId}}"
+              ]
+            },
+            "description": "Delete a saved address owned by the current customer."
+          }
+        },
+        {
+          "name": "Register Device Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/device-tokens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "device-tokens"
+              ]
+            },
+            "description": "Register (or re-register) a push notification device token for the current customer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"fcm-device-token-sample-{{$timestamp}}\",\n  \"platform\": \"ANDROID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Unregister Device Token",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/device-tokens/fcm-device-token-sample",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "device-tokens",
+                "fcm-device-token-sample"
+              ]
+            },
+            "description": "Unregister a push notification device token for the current customer."
+          }
+        },
+        {
+          "name": "Get Preferred Stylist",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/preferred-stylist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "preferred-stylist"
+              ]
+            },
+            "description": "Get the current customer's preferred/favorite stylist, if any."
+          }
+        },
+        {
+          "name": "Set Preferred Stylist",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/preferred-stylist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "preferred-stylist"
+              ]
+            },
+            "description": "Set the current customer's preferred stylist for quick re-booking.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"{{employeeId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Clear Preferred Stylist",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/preferred-stylist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "preferred-stylist"
+              ]
+            },
+            "description": "Clear the current customer's preferred stylist."
+          }
+        }
+      ],
+      "description": "Authenticated customer's own profile, addresses, push-notification device tokens and preferred stylist. Run after login."
+    },
+    {
+      "name": "03 Discover Salons",
+      "item": [
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ]
+            },
+            "description": "List all active service categories (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Get Category By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "1"
+              ]
+            },
+            "description": "Get a single service category by id (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "List Countries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locations/countries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations",
+                "countries"
+              ]
+            },
+            "description": "List all countries used to populate address/salon forms (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "List States",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locations/states?countryId=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations",
+                "states"
+              ],
+              "query": [
+                {
+                  "key": "countryId",
+                  "value": "1",
+                  "description": "country id"
+                }
+              ]
+            },
+            "description": "List states for a given country (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "List Cities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locations/cities?stateId=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations",
+                "cities"
+              ],
+              "query": [
+                {
+                  "key": "stateId",
+                  "value": "1",
+                  "description": "state id"
+                }
+              ]
+            },
+            "description": "List cities for a given state (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Search Salons",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons?city=Bangalore&minRating=3.5&maxPrice=5000&genderType=UNISEX&latitude=12.9716&longitude=77.5946&page=0&size=10&sortBy=ratingAverage&sortDirection=DESC",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons"
+              ],
+              "query": [
+                {
+                  "key": "city",
+                  "value": "Bangalore",
+                  "description": "filter by city name"
+                },
+                {
+                  "key": "minRating",
+                  "value": "3.5",
+                  "description": "minimum average rating"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "5000",
+                  "description": "maximum starting price"
+                },
+                {
+                  "key": "genderType",
+                  "value": "UNISEX",
+                  "description": "MALE | FEMALE | UNISEX"
+                },
+                {
+                  "key": "latitude",
+                  "value": "12.9716",
+                  "description": "caller latitude for distance sort"
+                },
+                {
+                  "key": "longitude",
+                  "value": "77.5946",
+                  "description": "caller longitude for distance sort"
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": ""
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": ""
+                },
+                {
+                  "key": "sortBy",
+                  "value": "ratingAverage",
+                  "description": ""
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "DESC",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Search publicly visible, approved and active salons by city/rating/price/gender-type/geo (public). Captures the first result's id/slug for later requests.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('salons fetched', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.content && d.content.length) {",
+                  "  pm.collectionVariables.set('salonId', d.content[0].id);",
+                  "  pm.collectionVariables.set('salonSlug', d.content[0].slug);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Salon Detail By Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonSlug}}?latitude=12.9716&longitude=77.5946",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonSlug}}"
+              ],
+              "query": [
+                {
+                  "key": "latitude",
+                  "value": "12.9716",
+                  "description": ""
+                },
+                {
+                  "key": "longitude",
+                  "value": "77.5946",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get full public detail of a salon by its slug, optionally with distanceKm when lat/lng are passed (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Search Services (Cross-Salon)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/search?categoryId=1&minPrice=100&maxPrice=5000&salonId={{salonId}}&page=0&size=10&sortBy=createdAt&sortDirection=DESC",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "categoryId",
+                  "value": "1",
+                  "description": ""
+                },
+                {
+                  "key": "minPrice",
+                  "value": "100",
+                  "description": ""
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "5000",
+                  "description": ""
+                },
+                {
+                  "key": "salonId",
+                  "value": "{{salonId}}",
+                  "description": ""
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": ""
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": ""
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "description": ""
+                },
+                {
+                  "key": "sortDirection",
+                  "value": "DESC",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Search ACTIVE services across all salons by category/price/salon (public discovery endpoint).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "List Salon Services",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services?managementView=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services"
+              ],
+              "query": [
+                {
+                  "key": "managementView",
+                  "value": "false",
+                  "description": "owner-only flag to include inactive services"
+                }
+              ]
+            },
+            "description": "List ACTIVE services offered by a salon (public). Captures the first service id.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('services fetched', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.length) { pm.collectionVariables.set('serviceId', d[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Salon Service Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services/{{serviceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services",
+                "{{serviceId}}"
+              ]
+            },
+            "description": "Get a single salon service by id (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "List Salon Employees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees?status=ACTIVE&serviceId={{serviceId}}&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "description": ""
+                },
+                {
+                  "key": "serviceId",
+                  "value": "{{serviceId}}",
+                  "description": ""
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": ""
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List employees/stylists for a salon, optionally filtered by status/service (public, used during booking). Captures the first employee id.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('employees fetched', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.content && d.content.length) { pm.collectionVariables.set('employeeId', d.content[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Salon Employee Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}"
+              ]
+            },
+            "description": "Get employee/stylist detail (public, used during booking).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "List Employee Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employees/{{employeeId}}/reviews?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employees",
+                "{{employeeId}}",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List an employee's visible reviews (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "List Salon Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/reviews?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List a salon's visible reviews (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Get Salon Rating Breakdown",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/reviews/rating-breakdown",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "reviews",
+                "rating-breakdown"
+              ]
+            },
+            "description": "Get the aggregate multi-criteria rating breakdown for a salon (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Add Salon To Favorites",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/favorites/{{salonId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "favorites",
+                "{{salonId}}"
+              ]
+            },
+            "description": "Add a salon to the current customer's favorites."
+          }
+        },
+        {
+          "name": "List My Favorite Salons",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/favorites?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "favorites"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List the current customer's favorite salons."
+          }
+        },
+        {
+          "name": "List My Recently Viewed Salons",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/recently-viewed?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "recently-viewed"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List the current customer's recently viewed salons, most recent first."
+          }
+        },
+        {
+          "name": "Remove Salon From Favorites",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/favorites/{{salonId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "favorites",
+                "{{salonId}}"
+              ]
+            },
+            "description": "Remove a salon from the current customer's favorites."
+          }
+        }
+      ],
+      "description": "Public browsing (categories, locations, salon search/detail, services, employees, reviews) plus the authenticated favorites and recently-viewed lists."
+    },
+    {
+      "name": "04 Slots & Booking",
+      "item": [
+        {
+          "name": "Get Available Slots",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/slots?date=2026-09-15&employeeId={{employeeId}}&serviceIds={{serviceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "slots"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-09-15",
+                  "description": "ISO date to check availability for"
+                },
+                {
+                  "key": "employeeId",
+                  "value": "{{employeeId}}",
+                  "description": "optional preferred stylist"
+                },
+                {
+                  "key": "serviceIds",
+                  "value": "{{serviceId}}",
+                  "description": "optional list of service ids"
+                }
+              ]
+            },
+            "description": "Get available booking slots for a salon on a given date, optionally filtered by employee/services (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Validate Coupon",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/coupons/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "coupons",
+                "validate"
+              ]
+            },
+            "description": "Preview a coupon's discount before booking; returns valid=false with a friendly message instead of an HTTP error. Requires authenticated customer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{couponCode}}\",\n  \"salonId\": \"{{salonId}}\",\n  \"orderAmount\": 1200.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "appointments"
+              ]
+            },
+            "description": "Create a new booking for the current customer. Captures the created booking id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"salonId\": \"{{salonId}}\",\n  \"employeeId\": \"{{employeeId}}\",\n  \"appointmentDate\": \"2026-09-15\",\n  \"startTime\": \"10:30\",\n  \"serviceIds\": [\n    \"{{serviceId}}\"\n  ],\n  \"couponCode\": \"WELCOME10\",\n  \"paymentMethod\": \"UPI\",\n  \"notes\": \"Please use a chair near the window\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('booking created', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.id) { pm.collectionVariables.set('bookingId', d.id); }",
+                  "if (d && d.bookingNumber) { pm.collectionVariables.set('bookingNumber', d.bookingNumber); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get My Bookings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appointments/my?status=PENDING&from=2026-01-01&to=2026-12-31&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "appointments",
+                "my"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING",
+                  "description": "optional BookingStatus filter"
+                },
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "description": "optional from date"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "description": "optional to date"
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": ""
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List bookings for the current customer, optionally filtered by status/date range."
+          }
+        },
+        {
+          "name": "Get Booking Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appointments/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "appointments",
+                "{{bookingId}}"
+              ]
+            },
+            "description": "Get a booking by its numeric id or booking number."
+          }
+        },
+        {
+          "name": "Get Rebook Template",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appointments/{{bookingId}}/rebook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "appointments",
+                "{{bookingId}}",
+                "rebook"
+              ]
+            },
+            "description": "Pre-fill a new booking request from a prior completed booking."
+          }
+        },
+        {
+          "name": "Reschedule Booking",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appointments/{{bookingId}}/reschedule",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "appointments",
+                "{{bookingId}}",
+                "reschedule"
+              ]
+            },
+            "description": "Reschedule an existing booking to a new date/time (and optionally a new employee).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newAppointmentDate\": \"2026-09-18\",\n  \"newStartTime\": \"14:00\",\n  \"newEmployeeId\": \"{{employeeId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appointments/{{bookingId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "appointments",
+                "{{bookingId}}",
+                "cancel"
+              ]
+            },
+            "description": "Cancel an existing booking, with an optional reason.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Change of plans\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Slot availability, coupon preview, booking creation and lifecycle (list, detail, rebook template, reschedule, cancel). Cancel is placed last per the requested journey order \u2014 run it only if you want to end the demo booking, since Payments/Reviews below reference the same {{bookingId}}."
+    },
+    {
+      "name": "05 Payments & Wallet",
+      "item": [
+        {
+          "name": "Initiate Payment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{bookingId}}/initiate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{bookingId}}",
+                "initiate"
+              ]
+            },
+            "description": "Initiate payment for a booking's pending payment. Captures the created paymentId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentMethod\": \"UPI\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('payment initiated', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.paymentId) { pm.collectionVariables.set('paymentId', d.paymentId); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm Payment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{paymentId}}",
+                "confirm"
+              ]
+            },
+            "description": "Confirm/capture a previously initiated gateway payment (ignored fields for CASH).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gatewayPaymentId\": \"pay_sample123456\",\n  \"gatewaySignature\": \"sample-signature-hash\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get Payment By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{paymentId}}"
+              ]
+            },
+            "description": "Get a payment by id."
+          }
+        },
+        {
+          "name": "List My Payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/my?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "my"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List the current customer's payments."
+          }
+        },
+        {
+          "name": "Get Invoice (JSON)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/invoice",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{paymentId}}",
+                "invoice"
+              ]
+            },
+            "description": "Get a structured JSON invoice for a successful payment."
+          }
+        },
+        {
+          "name": "Download Invoice PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/invoice.pdf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{paymentId}}",
+                "invoice.pdf"
+              ]
+            },
+            "description": "Download a PDF rendering of the invoice for a successful payment. Response is binary (application/pdf)."
+          }
+        },
+        {
+          "name": "Get Wallet Balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wallet/balance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wallet",
+                "balance"
+              ]
+            },
+            "description": "Get the current customer's wallet balance."
+          }
+        },
+        {
+          "name": "Get Wallet Transaction History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wallet/history?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wallet",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "Paginated wallet transaction history for the current customer."
+          }
+        },
+        {
+          "name": "Top Up Wallet",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wallet/topup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wallet",
+                "topup"
+              ]
+            },
+            "description": "Top up the wallet; CASH is settled immediately, gateway methods require a follow-up POST /payments/{id}/confirm call.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500.0,\n  \"paymentMethod\": \"UPI\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get Reward Point History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/reward-points?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "reward-points"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "Get the current customer's reward point history, paginated."
+          }
+        },
+        {
+          "name": "Get Reward Point Balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/reward-points/balance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "reward-points",
+                "balance"
+              ]
+            },
+            "description": "Get the current customer's reward point balance."
+          }
+        }
+      ],
+      "description": "Payment initiation/confirmation for the booking created above, invoices, wallet balance/top-up/history and reward points."
+    },
+    {
+      "name": "06 Reviews",
+      "item": [
+        {
+          "name": "Create Review",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reviews"
+              ]
+            },
+            "description": "Create a multi-criteria review for a completed appointment. Captures the created reviewId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointmentId\": \"{{bookingId}}\",\n  \"salonRating\": 5,\n  \"employeeRating\": 5,\n  \"cleanlinessRating\": 4,\n  \"serviceQualityRating\": 5,\n  \"valueForMoneyRating\": 4,\n  \"comment\": \"Wonderful experience, the stylist was excellent and the salon was spotless.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('review created', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.id) { pm.collectionVariables.set('reviewId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload Review Image",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reviews/{{reviewId}}/images",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reviews",
+                "{{reviewId}}",
+                "images"
+              ]
+            },
+            "description": "Upload and attach an image to the current customer's own review (multipart).",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "Image file (jpg/png)"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List My Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reviews/my?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reviews",
+                "my"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List reviews written by the current customer."
+          }
+        },
+        {
+          "name": "Update Review",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reviews/{{reviewId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reviews",
+                "{{reviewId}}"
+              ]
+            },
+            "description": "Update the rating/comment of the current customer's own review.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"salonRating\": 5,\n  \"employeeRating\": 5,\n  \"cleanlinessRating\": 5,\n  \"serviceQualityRating\": 5,\n  \"valueForMoneyRating\": 5,\n  \"comment\": \"Updating my review after a follow-up visit \\u2014 even better this time!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Report Review",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reviews/{{reviewId}}/report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reviews",
+                "{{reviewId}}",
+                "report"
+              ]
+            },
+            "description": "Report a review as inappropriate (any authenticated user; used here to demonstrate the moderation-reporting flow on the customer's own review).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Contains spam / inappropriate content\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Customer-authored multi-criteria review lifecycle: create, attach image, list mine, update, report."
+    },
+    {
+      "name": "07 Memberships & Gift Cards",
+      "item": [
+        {
+          "name": "List Salon Membership Plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/membership-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "membership-plans"
+              ]
+            },
+            "description": "List the active membership plans offered by a salon (public). Captures the first plan id.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('plans fetched', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.length) { pm.collectionVariables.set('membershipPlanId', d[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Purchase Membership",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/memberships/purchase",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "memberships",
+                "purchase"
+              ]
+            },
+            "description": "Purchase a membership plan; for CASH/gateway methods this returns details needed to finish confirmation. Captures the paymentId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{membershipPlanId}}\",\n  \"paymentMethod\": \"RAZORPAY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('membership purchase initiated', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.paymentId) { pm.collectionVariables.set('paymentId', d.paymentId); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm Membership Payment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/memberships/{{paymentId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "memberships",
+                "{{paymentId}}",
+                "confirm"
+              ]
+            },
+            "description": "Verify a gateway payment (or finalize a CASH payment) and activate the membership subscription. Captures the subscriptionId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gatewayPaymentId\": \"pay_membership_sample123\",\n  \"gatewaySignature\": \"sample-signature-hash\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json().data;",
+                  "if (d && d.subscription && d.subscription.id) { pm.collectionVariables.set('subscriptionId', d.subscription.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List My Membership Subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/memberships/my?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "memberships",
+                "my"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List the current customer's membership subscriptions."
+          }
+        },
+        {
+          "name": "Get Active Membership For Salon",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/memberships/salons/{{salonId}}/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "memberships",
+                "salons",
+                "{{salonId}}",
+                "active"
+              ]
+            },
+            "description": "Get the current customer's active membership subscription usable at a salon, if any."
+          }
+        },
+        {
+          "name": "Purchase Gift Card",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gift-cards/purchase",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gift-cards",
+                "purchase"
+              ]
+            },
+            "description": "Purchase a gift card; WALLET is settled immediately, gateway methods require a follow-up confirm call. Captures the gift card code when issued immediately.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000.0,\n  \"paymentMethod\": \"WALLET\",\n  \"recipientName\": \"Ananya Rao\",\n  \"recipientEmail\": \"ananya.rao@example.com\",\n  \"recipientPhone\": \"9876500011\",\n  \"message\": \"Happy Birthday! Enjoy a spa day on me.\",\n  \"validityDays\": 365\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('gift card purchase ok', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.code) { pm.collectionVariables.set('giftCardCode', d.code); }",
+                  "if (d && d.paymentId) { pm.collectionVariables.set('paymentId', d.paymentId); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm Gift Card Purchase",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gift-cards/{{paymentId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gift-cards",
+                "{{paymentId}}",
+                "confirm"
+              ]
+            },
+            "description": "Confirm a gateway-method gift card purchase and issue the gift card. Not needed for the WALLET sample above (already issued); kept here to demonstrate the gateway-method flow.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gatewayPaymentId\": \"pay_giftcard_sample123\",\n  \"gatewaySignature\": \"sample-signature-hash\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json().data;",
+                  "if (d && d.code) { pm.collectionVariables.set('giftCardCode', d.code); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check Gift Card Balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gift-cards/{{giftCardCode}}/balance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gift-cards",
+                "{{giftCardCode}}",
+                "balance"
+              ]
+            },
+            "description": "Publicly check a gift card's balance and status by code (public).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "List My Purchased Gift Cards",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gift-cards/my?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gift-cards",
+                "my"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List gift cards purchased by the current customer."
+          }
+        },
+        {
+          "name": "Redeem Gift Card",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/gift-cards/redeem",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gift-cards",
+                "redeem"
+              ]
+            },
+            "description": "Redeem a gift card in full into the current customer's wallet.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{giftCardCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Browse and purchase salon membership plans (with payment confirm) and platform gift cards (purchase, public balance check, list mine, redeem)."
+    },
+    {
+      "name": "08 Family & Waitlist",
+      "item": [
+        {
+          "name": "List My Family Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "family-members"
+              ]
+            },
+            "description": "List the current customer's family/dependent profiles."
+          }
+        },
+        {
+          "name": "Add Family Member",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "family-members"
+              ]
+            },
+            "description": "Add a new family member for the current customer, to book on their behalf. Captures the created id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rohan Sharma\",\n  \"relationship\": \"CHILD\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"2015-04-10\",\n  \"phone\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('family member created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.id) { pm.collectionVariables.set('familyMemberId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Family Member",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/family-members/{{familyMemberId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "family-members",
+                "{{familyMemberId}}"
+              ]
+            },
+            "description": "Get a single family member owned by the current customer."
+          }
+        },
+        {
+          "name": "Update Family Member",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/family-members/{{familyMemberId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "family-members",
+                "{{familyMemberId}}"
+              ]
+            },
+            "description": "Update a family member owned by the current customer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rohan Sharma\",\n  \"relationship\": \"CHILD\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"2015-04-10\",\n  \"phone\": \"9876543299\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Family Member",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/family-members/{{familyMemberId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "family-members",
+                "{{familyMemberId}}"
+              ]
+            },
+            "description": "Remove a family member owned by the current customer."
+          }
+        },
+        {
+          "name": "Join Waitlist",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/waitlist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "waitlist"
+              ]
+            },
+            "description": "Join the waitlist for a fully booked (or preferred) salon/employee/date. Captures the created waitlist entry id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"salonId\": \"{{salonId}}\",\n  \"employeeId\": \"{{employeeId}}\",\n  \"serviceId\": \"{{serviceId}}\",\n  \"preferredDate\": \"2026-09-20\",\n  \"preferredStartTime\": \"11:00\",\n  \"preferredEndTime\": \"13:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('joined waitlist', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.id) { pm.collectionVariables.set('waitlistId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List My Waitlist Entries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/waitlist/my?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "waitlist",
+                "my"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List the current customer's own waitlist entries."
+          }
+        },
+        {
+          "name": "Leave Waitlist (Cancel Entry)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/waitlist/{{waitlistId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "waitlist",
+                "{{waitlistId}}"
+              ]
+            },
+            "description": "Cancel the current customer's own waitlist entry."
+          }
+        }
+      ],
+      "description": "Family/dependent profile CRUD used for booking on behalf of others, plus joining/leaving a salon notify-me waitlist."
+    },
+    {
+      "name": "09 Chat & Support",
+      "item": [
+        {
+          "name": "Get Or Create Salon Support Conversation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations/salon/{{salonId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations",
+                "salon",
+                "{{salonId}}"
+              ]
+            },
+            "description": "Get or create the current customer's SALON_SUPPORT conversation with a salon. Captures the conversationId. Note: live message sending happens over the STOMP WebSocket endpoint (ChatWebSocketController), which has no plain-REST equivalent and is therefore not represented here."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('conversation ready', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.id) { pm.collectionVariables.set('conversationId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Or Create Platform Support Conversation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations/support",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations",
+                "support"
+              ]
+            },
+            "description": "Get or create the current customer's PLATFORM_SUPPORT conversation."
+          }
+        },
+        {
+          "name": "List My Conversations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List the current customer's conversations."
+          }
+        },
+        {
+          "name": "List Conversation Messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations/{{conversationId}}/messages?page=0&size=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations",
+                "{{conversationId}}",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": ""
+                },
+                {
+                  "key": "size",
+                  "value": "30",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Paginated message history for a conversation (participants only)."
+          }
+        },
+        {
+          "name": "Mark Conversation Read",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations/{{conversationId}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations",
+                "{{conversationId}}",
+                "read"
+              ]
+            },
+            "description": "Mark all unread messages in a conversation as read by the current customer."
+          }
+        },
+        {
+          "name": "Close Conversation",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/conversations/{{conversationId}}/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "conversations",
+                "{{conversationId}}",
+                "close"
+              ]
+            },
+            "description": "Close a conversation (participants only)."
+          }
+        },
+        {
+          "name": "Create Support Ticket",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/support/tickets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "tickets"
+              ]
+            },
+            "description": "Raise a new platform support ticket. Captures the created ticketId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Unable to reschedule my booking\",\n  \"category\": \"BOOKING\",\n  \"priority\": \"MEDIUM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ticket created', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.id) { pm.collectionVariables.set('ticketId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List My Support Tickets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/support/tickets?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "tickets"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List the current customer's support tickets."
+          }
+        },
+        {
+          "name": "Get Support Ticket",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/support/tickets/{{ticketId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "tickets",
+                "{{ticketId}}"
+              ]
+            },
+            "description": "Get a support ticket owned by the current customer."
+          }
+        },
+        {
+          "name": "Add Support Ticket Message",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/support/tickets/{{ticketId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "tickets",
+                "{{ticketId}}",
+                "messages"
+              ]
+            },
+            "description": "Add a follow-up message to the current customer's own support ticket.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Any update on this? Still unable to reschedule.\",\n  \"internalNote\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List Support Ticket Messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/support/tickets/{{ticketId}}/messages?page=0&size=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "support",
+                "tickets",
+                "{{ticketId}}",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": ""
+                },
+                {
+                  "key": "size",
+                  "value": "30",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List messages on a support ticket owned by the current customer (internal notes hidden from non-admins)."
+          }
+        }
+      ],
+      "description": "In-app chat conversation history/lifecycle and the platform support ticket flow."
+    },
+    {
+      "name": "10 Privacy & Misc",
+      "item": [
+        {
+          "name": "Create Data Subject Request (GDPR Export)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privacy/requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privacy",
+                "requests"
+              ]
+            },
+            "description": "Raise a new GDPR/DPDP data export or account-deletion request for the current customer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestType\": \"EXPORT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('data request created', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.id) { pm.collectionVariables.set('dataRequestId', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List My Data Subject Requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privacy/requests?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privacy",
+                "requests"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "zero-based page index"
+                },
+                {
+                  "key": "size",
+                  "value": "10",
+                  "description": "page size"
+                }
+              ]
+            },
+            "description": "List the current customer's own GDPR/DPDP data subject requests."
+          }
+        },
+        {
+          "name": "Get My Data Subject Request",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privacy/requests/{{dataRequestId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privacy",
+                "requests",
+                "{{dataRequestId}}"
+              ]
+            },
+            "description": "Get one of the current customer's own data subject requests."
+          }
+        },
+        {
+          "name": "List Active Feature Flags",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/feature-flags",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "feature-flags"
+              ]
+            },
+            "description": "List all currently active feature flags as a key-value map, for client-side use. Requires any authenticated user (not a public endpoint, but not admin-restricted either)."
+          }
+        },
+        {
+          "name": "Download Booking Calendar (.ics)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appointments/{{bookingId}}/calendar.ics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "appointments",
+                "{{bookingId}}",
+                "calendar.ics"
+              ]
+            },
+            "description": "Download the booking as an .ics calendar file (owner or admin only). Response is binary (text/calendar)."
+          }
+        },
+        {
+          "name": "Get Google Calendar Link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appointments/{{bookingId}}/calendar/google-link",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "appointments",
+                "{{bookingId}}",
+                "calendar",
+                "google-link"
+              ]
+            },
+            "description": "Get a pre-filled Google Calendar 'add event' link for the booking (owner or admin only)."
+          }
+        },
+        {
+          "name": "Guest Booking - Create",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/guest/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guest",
+                "bookings"
+              ]
+            },
+            "description": "Book an appointment without a full account (public). Resolves/creates a lightweight guest identity and returns a real access/refresh token pair for managing the booking afterward.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guestName\": \"Kavya Menon\",\n  \"guestEmail\": \"kavya.menon@example.com\",\n  \"guestPhone\": \"9123456780\",\n  \"salonId\": \"{{salonId}}\",\n  \"employeeId\": \"{{employeeId}}\",\n  \"appointmentDate\": \"2026-09-16\",\n  \"startTime\": \"16:00\",\n  \"serviceIds\": [\n    \"{{serviceId}}\"\n  ],\n  \"couponCode\": \"\",\n  \"paymentMethod\": \"CASH\",\n  \"notes\": \"First time visiting, please call before arrival\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('guest booking created', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.bookingNumber) { pm.collectionVariables.set('guestBookingNumber', d.bookingNumber); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Guest Booking - Lookup",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/guest/bookings/lookup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guest",
+                "bookings",
+                "lookup"
+              ]
+            },
+            "description": "Find a guest booking using the phone number used at booking time plus the booking number as a shared secret (public, read-only, no token required).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9123456780\",\n  \"bookingNumber\": \"{{guestBookingNumber}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Deactivate My Account",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "deactivate"
+              ]
+            },
+            "description": "OPTIONAL / DESTRUCTIVE - deactivates the current customer's account. Skip this during a normal full-collection run; only run intentionally at the very end of a test cycle."
+          }
+        },
+        {
+          "name": "Delete My Account",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/account",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "account"
+              ]
+            },
+            "description": "OPTIONAL / DESTRUCTIVE - soft-deletes the current customer's account. Skip this during a normal full-collection run; only run intentionally at the very end of a test cycle."
+          }
+        },
+        {
+          "name": "Logout (Current Device)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "LOGOUT - revokes the current refresh token and blacklists the current access token. Run this LAST, after every other request in the collection, since it invalidates {{accessToken}}.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Logout All Devices",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            },
+            "description": "LOGOUT - revokes every refresh token for the current user across all devices. The very last request in the whole collection."
+          }
+        }
+      ],
+      "description": "GDPR/DPDP data subject requests, feature flags, calendar export, guest (no-account) booking, and \u2014 as the final two items of the entire collection \u2014 logout / logout-all."
+    }
+  ]
+}
