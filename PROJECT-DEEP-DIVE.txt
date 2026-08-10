@@ -1,0 +1,1969 @@
+================================================================================
+                       SALOFRESH — PROJECT DEEP DIVE
+        Complete Reverse-Engineering & Interview Preparation Document
+================================================================================
+Derived 100% from actual source code inspection of the repository
+`sskumaraloha/salofresh-monolithic`, branch `claude/salofresh-backend-app-72litp`.
+Every class name, file path, table name, and configuration value in this
+document was verified against the real code. Where something does NOT exist,
+it is explicitly marked "NOT IMPLEMENTED IN CURRENT PROJECT".
+
+Verified repository statistics (counted from source):
+  - 734 Java files total
+  - 70 JPA entities            (src/main/java/com/salofresh/entity/)
+  - 71 Spring Data repositories (src/main/java/com/salofresh/repository/)
+  - 71 REST controllers, 274 HTTP endpoints
+  - 121 service files (interfaces + implementations)
+  - 58 enums (src/main/java/com/salofresh/common/enums/)
+  - 72 database tables across 5 Flyway migrations (1,510 lines of SQL)
+  - 68 explicit secondary indexes in the migrations
+  - 5 test classes
+
+================================================================================
+ 1. EXECUTIVE SUMMARY
+================================================================================
+
+SaloFresh is a multi-tenant Salon Management SaaS platform backend, built as a
+MODULAR MONOLITH with:
+
+  - Java 21, Spring Boot 3.3.4, Maven (single-jar packaging: salofresh-backend.jar)
+  - MySQL (production) / H2 in MySQL-compatibility mode (tests), managed by
+    Flyway migrations V1–V5
+  - Spring Security 6: stateless JWT auth (JJWT 0.12.6, HS256) + Google OAuth2
+    login, role-based method security (@PreAuthorize), token blacklisting,
+    account lockout, OTP verification
+  - 3 user-facing domains: Customers (booking, wallet, reviews, memberships,
+    gift cards, chat), Salon Owners (staff, inventory, payroll, marketing,
+    payouts, platform subscription), Platform Admins (moderation, fraud
+    detection, support tickets, feature flags, GDPR requests, maker-checker
+    approvals, webhooks)
+  - In-JVM asynchronous processing: Spring ApplicationEvents consumed by
+    @Async @TransactionalEventListener(AFTER_COMMIT) listeners on a dedicated
+    ThreadPoolTaskExecutor
+  - Caffeine in-process caching (9 named caches, 15-min TTL, 2000 entries max)
+  - Bucket4j in-memory rate limiting on authentication endpoints
+  - Payment gateway abstraction (Razorpay + Stripe implementations) with
+    HMAC-verified, idempotent webhook ingestion
+  - WebSocket/STOMP for in-app chat
+  - OpenAPI/Swagger documentation via springdoc
+
+NOT IMPLEMENTED IN CURRENT PROJECT: Docker/containerization, Kubernetes, CI/CD
+pipelines, README, Redis/distributed cache, message broker (Kafka/RabbitMQ),
+distributed tracing, Prometheus/Grafana metrics export, load balancer config.
+
+================================================================================
+ 2. BUSINESS PROBLEM
+================================================================================
+
+The platform solves three connected problems (derived from the domain model,
+not a README — there is no README):
+
+1. FOR CUSTOMERS: discovering salons (by location/category — countries/states/
+   cities tables + SalonSpecification filtering), booking appointment slots
+   with a specific employee, paying online (Razorpay/Stripe/wallet/cash),
+   earning reward points, reviewing salons, managing family-member bookings,
+   buying gift cards and salon membership packages, chatting with salons.
+
+2. FOR SALON OWNERS: running the business — staff scheduling and attendance,
+   commission-based payroll (commission_rules + payroll_records tables),
+   inventory (products + stock_transactions), CRM notes, marketing campaigns,
+   consolidated multi-branch dashboards, and receiving payouts net of platform
+   commission (salon_payouts).
+
+3. FOR THE PLATFORM (SaaS operator): monetization via platform subscription
+   plans that owners buy (platform_plans / platform_subscriptions) and via
+   commission on payouts; plus operations: salon approval workflow, user/review
+   moderation, fraud detection, support ticketing, GDPR/DPDP compliance,
+   feature flags, and maker-checker approval for dangerous actions.
+
+Revenue model visible in code: `PlatformPlan.commissionPercentage` +
+`AppProperties.Payout.defaultCommissionPercentage` (10% default, applied in
+the payout service when an owner has no active subscription).
+
+================================================================================
+ 3. FEATURES (COMPLETE, AS IMPLEMENTED)
+================================================================================
+
+AUTH & IDENTITY (controller/auth, service/auth, security/)
+  - Email/password registration + login, BCrypt(12) hashing
+  - OTP generation/verification (otp table, 6 digits, 10-min expiry,
+    5 max attempts, 60s resend cooldown — app.otp.* in application.yml)
+  - Google OAuth2 login (CustomOAuth2UserService, OAuth2LoginSuccessHandler)
+  - JWT access (15 min) + refresh tokens (7d / 30d remember-me), rotation,
+    logout via blacklisted_tokens (by jti)
+  - Account lockout: 5 failed attempts -> locked 30 min
+    (app.security.max-failed-login-attempts / account-lock-duration-minutes)
+  - Login history tracking (login_history table)
+  - Referral codes on users (referral_code / referred_by_code columns)
+
+CUSTOMER FEATURES
+  - Salon discovery: filtering/search via SalonSpecification, location data
+    (countries/states/cities), recently_viewed_salons, favorites
+  - Slot availability engine: SlotAvailabilityServiceImpl computes free slots
+    from working_hours, holidays, employee_schedule, employee_leave, and
+    existing appointments
+  - Booking lifecycle: BookingServiceImpl (create/confirm/cancel/complete/
+    reschedule) with BookingStatus state machine and events
+    (BookingCreatedEvent, BookingCancelledEvent, ...)
+  - Payments: initiate/confirm via PaymentService with gateway Strategy
+    (RazorpayPaymentGatewayImpl, StripePaymentGatewayImpl), refunds,
+    transactions ledger, PDF invoices (com.salofresh.pdf, OpenPDF)
+  - Wallet with optimistic locking (@Version on Wallet), wallet_transactions
+  - Reward points, coupons + coupon_usage tracking
+  - Reviews with multi-criteria ratings (salon_rating, employee_rating,
+    cleanliness_rating, service_quality_rating, value_for_money_rating),
+    review images, report/moderation flow (ReviewStatus VISIBLE/REPORTED/HIDDEN)
+  - Push notifications (FCM HTTP v1 via google-auth-library), WhatsApp
+    (provider-switchable, console fallback), SMS (Twilio config, console
+    fallback), email (JavaMail), notification persistence
+  - Waitlist / notify-me (waitlist table + WaitlistNotifierListener +
+    WaitlistCleanupScheduler)
+  - Membership packages (membership_plans/membership_subscriptions),
+    gift cards (with balance check public endpoint), family members
+  - In-app chat: chat_conversations/chat_messages + WebSocket/STOMP
+    (WebSocketConfig, StompAuthChannelInterceptor authenticates the JWT on
+    CONNECT), guest booking flow (controller/guest)
+  - Calendar export (com.salofresh.calendar), preferred stylist
+    (customers.preferred_employee_id)
+
+SALON OWNER FEATURES
+  - Salon onboarding with document upload + admin verification
+    (VerificationStatus PENDING/APPROVED/REJECTED), galleries, working hours,
+    holidays
+  - Employee management: schedules, leave, attendance, employee_services
+    mapping, shift-swap requests (shift_swap_requests)
+  - Commission/payroll: commission_rules (column rule_value — renamed because
+    VALUE is an H2/MySQL reserved word), payroll_records
+  - Inventory: products, stock_transactions, service_product_usage +
+    InventoryDeductionListener (auto-deducts stock after booking completion,
+    AFTER_COMMIT async listener)
+  - CRM: customer_notes per salon-customer pair
+  - Marketing: marketing_campaigns + campaign_recipients +
+    CampaignDispatchScheduler (async fan-out via MarketingCampaignServiceImpl)
+  - Owner dashboards incl. multi-branch comparison
+    (OwnerDashboardServiceImpl.getBranchComparison ->
+    GET /api/v1/owners/me/dashboard/branches)
+  - Platform billing: owners subscribe to platform_plans
+    (PlatformBillingServiceImpl; Starter/Growth/Enterprise seeded in V4)
+  - Payout reports: salon_payouts generation with commission deduction
+
+ADMIN / PLATFORM FEATURES
+  - Salon moderation: approve/reject/suspend (AdminSalonServiceImpl, writes
+    audit_logs rows + publishes SalonApprovedEvent etc.)
+  - User management: suspend/reactivate (AdminUserController)
+  - Review moderation (AdminReviewController -> ReviewServiceImpl.moderate)
+  - Audit log viewer (AdminAuditLogController, filter by entityName/action)
+  - Role & permission management, SUPER_ADMIN-only (AdminRoleController,
+    AdminPermissionController; permission sets per role via role_permissions)
+  - Fraud detection: FraudDetectionScheduler (hourly cron "0 0 * * * *") runs
+    three heuristics — repeated failed payments (>=3/24h), review bombing
+    (>=5 five-star reviews/24h), referral abuse (>10 referrals/24h) — writing
+    idempotent fraud_alerts; admin resolve endpoint
+  - Support ticketing: support_tickets + ticket_messages with admin-only
+    internal notes, assignment, status flow
+  - Feature flags: feature_flags (flag_key/flag_value columns — `key`/`value`
+    are reserved words), typed reads via FeatureFlagQueryService with
+    Caffeine caching (FeatureFlagCacheLoader), admin CRUD with cache eviction
+  - GDPR/DPDP: data_subject_requests; export writes a JSON dump of the user's
+    data to the upload dir; deletion soft-deletes + anonymizes nullable PII
+  - Bulk CSV import/export (Apache Commons CSV): export categories/salons/
+    users, import categories with per-row error report (BulkImportResult)
+  - Payment webhooks: POST /api/v1/webhooks/razorpay|stripe — public but
+    HMAC-signature-verified, idempotent via unique webhook_event_logs.event_id
+  - Maker-checker approvals: approval_requests; an ADMIN queues a high-risk
+    action (LARGE_REFUND, SALON_SUSPENSION, USER_BAN, PAYOUT_OVERRIDE), a
+    DIFFERENT SUPER_ADMIN approves; self-approval throws ForbiddenException
+  - Platform plan/commission CRUD (AdminPlatformPlanController)
+  - Platform dashboards & reports (AdminDashboardController,
+    AdminReportController: revenue/booking/customer/salon reports with
+    date-range + group-by)
+
+================================================================================
+ 4. TECHNOLOGY STACK (WITH JUSTIFICATION)
+================================================================================
+
+Everything below is provable from pom.xml and src/main/resources/*.yml.
+
+LANGUAGE: Java 21 (pom <java.version>21</java.version>)
+  Why: LTS release; records/pattern-matching available; required by Spring
+  Boot 3.x baseline (Java 17+). Alternative: Kotlin (less common in
+  enterprise Java teams), Java 17 (fewer language features).
+  Disadvantage: none material here; virtual threads exist in 21 but are NOT
+  enabled in this project (no spring.threads.virtual.enabled).
+
+FRAMEWORK: Spring Boot 3.3.4 (parent POM), Spring Framework 6.1.13
+  Why: the de-facto enterprise Java stack — DI, MVC, Security, Data JPA,
+  auto-configuration, embedded Tomcat (spring-boot-starter-web -> Tomcat is
+  the web server; no external reverse proxy is configured in this repo).
+  Alternatives: Quarkus/Micronaut (faster startup, smaller footprint, but
+  smaller ecosystem and team familiarity); Jakarta EE (heavier).
+  Disadvantage: reflection-heavy, slower cold start, larger memory footprint.
+
+DATABASE: MySQL 8 (com.mysql:mysql-connector-j, MySQLDialect in
+  application-prod.yml; InnoDB engine specified on every CREATE TABLE).
+  H2 (test scope) runs migrations in MySQL compatibility mode for tests.
+  Why MySQL: relational integrity for a heavily transactional domain
+  (bookings, payments, wallets, payouts) with many FK relationships; ACID
+  needed for money movement. Version not pinned in repo — the JDBC URL is
+  env-driven (jdbc:mysql://${DB_HOST}...).
+  Alternative: PostgreSQL (arguably better JSON/locking features — either is
+  defensible); NoSQL (rejected — see trade-offs §28).
+  Disadvantage: vertical scaling limits; JSON handling weaker than Postgres.
+
+ORM: Hibernate 6.5.3 via spring-boot-starter-data-jpa; Spring Data JPA
+  repositories (71 interfaces), derived queries + @Query JPQL +
+  JpaSpecificationExecutor for dynamic filtering (e.g. SalonSpecification,
+  ReviewSpecification in com.salofresh.specification).
+  ddl-auto: validate in prod — schema owned by Flyway, never by Hibernate.
+
+MIGRATIONS: Flyway (flyway-core + flyway-mysql). 5 versioned migrations:
+  V1__init_schema.sql (812 lines, ~41 core tables + seed-independent schema)
+  V2__seed_data.sql (roles, permissions, categories, geo data, admin user)
+  V3__customer_features.sql, V4__salon_owner_features.sql,
+  V5__admin_platform_features.sql
+  Why: repeatable, versioned, reviewable schema evolution; validated in CI...
+  actually validated in tests (FlywayMigrationTest) since there is no CI.
+  Alternative: Liquibase (XML/YAML changelogs; more abstraction, less raw SQL
+  control). Hibernate ddl-auto=update rejected: non-deterministic, dangerous.
+
+BUILD: Maven (single pom.xml, spring-boot-maven-plugin, finalName
+  salofresh-backend, annotation processors: Lombok + MapStruct +
+  lombok-mapstruct-binding, -parameters compiler flag).
+  Alternative: Gradle (faster incremental builds; Maven chosen for
+  convention/simplicity).
+
+AUTHENTICATION: Custom JWT via JJWT 0.12.6 (jjwt-api/impl/jackson), HS256
+  symmetric signing (JwtTokenProvider.signingKey() ->
+  Keys.hmacShaKeyFor(secret)). Access token 15 min, refresh 7 d (30 d with
+  rememberMe). Google OAuth2 social login via spring-boot-starter-oauth2-client.
+  NOTE: spring-boot-starter-oauth2-resource-server is on the classpath but the
+  resource-server DSL is NOT configured — token validation is done by the
+  custom JwtAuthenticationFilter instead. (Honest answer: that dependency is
+  effectively unused; a cleanup candidate.)
+  Alternatives: opaque tokens + Redis session (needs Redis), Keycloak
+  (operational overhead), RS256 asymmetric keys (better for multi-service —
+  see §28).
+
+AUTHORIZATION: Spring Security method security —
+  @EnableMethodSecurity(prePostEnabled = true) in SecurityConfig; role checks
+  via @PreAuthorize("hasRole/hasAnyRole") on 71 controllers; endpoint-level
+  permitAll from SecurityConstants.PUBLIC_ENDPOINTS; fine-grained ownership
+  checks in services (compare SecurityUtils.getCurrentUserId() against the
+  aggregate owner).
+
+API: REST/JSON, path-versioned under /api/v1 (AppConstants.API_BASE_PATH),
+  documented with springdoc-openapi 2.6.0 (Swagger UI at /swagger-ui.html,
+  spec at /api-docs; OpenApiConfig registers the bearer scheme).
+
+CACHE: Caffeine (in-process). CacheConfig builds a CaffeineCacheManager with
+  9 named caches (CacheNames.SALONS, SALON_DETAILS, SERVICES, CATEGORIES,
+  CITIES, STATES, COUNTRIES, POPULAR_SALONS, FEATURE_FLAGS),
+  expireAfterWrite=15m, maximumSize=2000. Also declared in application.yml
+  (spring.cache.type: caffeine).
+  Alternative: Redis — required the moment the app runs >1 instance (§14).
+
+RATE LIMITING: Bucket4j 8.10.1 — RateLimitingFilter (com.salofresh.filter)
+  guards /api/v1/auth/** only; token bucket 20 capacity / 20 refill per 60 s
+  (app.rate-limit.*), keyed by client-IP:URI (X-Forwarded-For aware), buckets
+  held in an in-memory ConcurrentHashMap.
+
+MESSAGING (async): NO external broker. Spring ApplicationEventPublisher with
+  19 domain event classes (com.salofresh.event.*) consumed by
+  @Async("taskExecutor") @TransactionalEventListener(phase = AFTER_COMMIT,
+  fallbackExecution = true) listeners: NotificationEventListener,
+  InventoryDeductionListener, WaitlistNotifierListener. Executor: core 5,
+  max 20, queue 500 (AsyncConfig).
+
+REAL-TIME: spring-boot-starter-websocket, STOMP simple broker
+  (WebSocketConfig), JWT authenticated at CONNECT via
+  StompAuthChannelInterceptor; used by the chat module.
+
+FILE STORAGE: local filesystem (com.salofresh.file, LocalFileStorageServiceImpl;
+  app.file.upload-dir=./uploads, served at /files/**, 5 MB limit,
+  jpg/jpeg/png/pdf whitelist). NOT S3 — single-instance assumption.
+
+EXTERNAL INTEGRATIONS:
+  - Razorpay & Stripe (hand-rolled HTTP + HMAC — no official SDKs in pom)
+  - Firebase Cloud Messaging HTTP v1 (google-auth-library-oauth2-http mints
+    OAuth2 bearer tokens from a service-account JSON)
+  - Twilio SMS + Meta WhatsApp (config present; both default to a "console"
+    provider that logs instead of sending — safe dev fallback)
+  - SMTP email (spring-boot-starter-mail)
+  - ZXing (QR codes, e.g. gift cards), OpenPDF (invoices), Commons CSV (bulk)
+
+LOGGING: SLF4J/Logback via Lombok @Slf4j; levels per profile
+  (root INFO / com.salofresh DEBUG in default; root WARN / com.salofresh INFO
+  in prod). RequestLoggingInterceptor logs "METHOD URI -> status (N ms)".
+  Correlation/request IDs: NOT IMPLEMENTED IN CURRENT PROJECT.
+
+MONITORING: Spring Boot Actuator — only health, info, metrics exposed
+  (management.endpoints.web.exposure.include). No Prometheus registry, no
+  tracing, no alerting: NOT IMPLEMENTED IN CURRENT PROJECT.
+
+TESTING: JUnit 5 + Mockito + spring-boot-starter-test + spring-security-test
+  + H2. Five classes (see §25).
+
+CONTAINERIZATION / CI/CD / CLOUD / REVERSE PROXY:
+  NOT IMPLEMENTED IN CURRENT PROJECT. No Dockerfile, docker-compose, K8s
+  manifests, Jenkinsfile, or .github/workflows exist. Deployment artifact is
+  the fat jar target/salofresh-backend.jar (embedded Tomcat).
+
+================================================================================
+ 5. REPOSITORY STRUCTURE
+================================================================================
+
+salofresh-monolithic/
+├── pom.xml                          # Maven build, all deps, Java 21
+├── .gitignore
+└── src/
+    ├── main/
+    │   ├── java/com/salofresh/
+    │   │   ├── SaloFreshApplication.java     # @SpringBootApplication entry
+    │   │   ├── audit/                # Auditable @MappedSuperclass +
+    │   │   │                         # AuditorAwareImpl (who-did-what stamps)
+    │   │   ├── calendar/             # ICS calendar export for bookings
+    │   │   ├── common/enums/         # 58 shared enums (BookingStatus,
+    │   │   │                         # PaymentStatus, RoleName, ...)
+    │   │   ├── config/               # AppProperties (@ConfigurationProperties
+    │   │   │                         # "app"), CacheConfig, AsyncConfig,
+    │   │   │                         # CorsConfig, OpenApiConfig, WebConfig,
+    │   │   │                         # WebSocketConfig, PasswordEncoderConfig
+    │   │   ├── constant/             # AppConstants, SecurityConstants
+    │   │   │                         # (PUBLIC_ENDPOINTS array), CacheNames
+    │   │   ├── controller/<feature>/ # 71 REST controllers in 24 feature
+    │   │   │                         # packages: auth, booking, payment,
+    │   │   │                         # salon, admin, review, chat, giftcard,
+    │   │   │                         # membership, waitlist, inventory,
+    │   │   │                         # payroll, marketing, crm, payout,
+    │   │   │                         # platformbilling, support, webhook, ...
+    │   │   ├── coupon/               # coupon engine helpers
+    │   │   ├── dto/<feature>/        # request/response DTOs w/ Bean
+    │   │   │                         # Validation annotations
+    │   │   ├── email/ sms/ whatsapp/ push/  # channel gateways (@Async)
+    │   │   ├── entity/               # 70 JPA entities, most extend Auditable
+    │   │   ├── event/                # 19 domain event POJOs
+    │   │   ├── exception/            # BaseException hierarchy + ErrorCode +
+    │   │   │                         # GlobalExceptionHandler (@RestControllerAdvice)
+    │   │   ├── file/                 # FileStorageService (local disk impl)
+    │   │   ├── filter/               # RateLimitingFilter (Bucket4j)
+    │   │   ├── interceptor/          # RequestLoggingInterceptor (timing log)
+    │   │   ├── listener/             # async AFTER_COMMIT event consumers
+    │   │   ├── mapper/<feature>/     # MapStruct mappers (componentModel=spring)
+    │   │   ├── notification/ otp/ pdf/ wallet/  # focused domain services
+    │   │   ├── pagination/ response/ # ApiResponse<T>, PagedResponse<T>,
+    │   │   │                         # ErrorDetail envelope types
+    │   │   ├── repository/           # 71 Spring Data JPA interfaces
+    │   │   ├── scheduler/            # CampaignDispatchScheduler,
+    │   │   │                         # FraudDetectionScheduler,
+    │   │   │                         # WaitlistCleanupScheduler (@Scheduled)
+    │   │   ├── security/             # SecurityConfig, JwtTokenProvider,
+    │   │   │                         # JwtAuthenticationFilter, OAuth2 handlers,
+    │   │   │                         # UserPrincipal, SecurityUtils, STOMP auth
+    │   │   ├── service/<feature>/    # service INTERFACES per feature
+    │   │   ├── service/impl/<feature>/ # implementations
+    │   │   ├── specification/        # JPA Specifications (dynamic filters)
+    │   │   ├── util/ validation/     # helpers, custom validators
+    │   │   └── ...
+    │   └── resources/
+    │       ├── application.yml               # base config, app.* properties
+    │       ├── application-dev.yml           # local MySQL, verbose logging
+    │       ├── application-prod.yml          # env-only creds, Hikari pool 20,
+    │       │                                 # ddl-auto=validate, open-in-view=false
+    │       ├── application-test.yml          # H2 in MySQL mode
+    │       └── db/migration/V1..V5__*.sql    # 72 tables, 68 indexes, seed data
+    └── test/java/com/salofresh/
+        ├── FlywayMigrationTest.java          # migrations apply cleanly on H2
+        ├── SaloFreshApplicationTests.java    # full context load smoke test
+        └── service/{auth,booking,payment}/   # Mockito unit tests
+
+Responsibility rule: controllers do HTTP + validation + auth annotations only;
+services own business logic and transactions; repositories own persistence;
+mappers own entity<->DTO conversion; listeners own post-commit side effects.
+
+================================================================================
+ 6. ARCHITECTURE
+================================================================================
+
+ACTUAL ARCHITECTURE (from code, not assumption):
+A LAYERED, FEATURE-MODULAR MONOLITH with in-process event-driven side effects.
+
+- Single deployable (one @SpringBootApplication, one jar, one database).
+- Horizontal layering: Controller -> Service interface -> ServiceImpl ->
+  Repository -> Entity, consistently applied across all 24 feature packages.
+- Vertical modularity: every layer is sub-packaged BY FEATURE
+  (controller/booking, service/booking, dto/booking, mapper/booking...), so
+  the monolith has microservice-shaped seams without the distribution cost.
+- Event-driven internals: writes publish Spring ApplicationEvents; listeners
+  run asynchronously AFTER the transaction commits, decoupling side effects
+  (notifications, stock deduction, waitlist promotion) from the request path.
+- It is NOT Clean/Hexagonal architecture: services depend directly on JPA
+  repositories and entities (no ports/adapters, no domain layer isolated from
+  Spring). It is NOT CQRS: same model reads and writes. It is NOT
+  microservices: one process, one DB, in-JVM events.
+
+ARCHITECTURE DIAGRAM:
+
+```mermaid
+flowchart TB
+    subgraph Clients
+        MOB[Mobile / Web App]
+        GW[Payment Gateways<br/>Razorpay / Stripe]
+    end
+
+    subgraph "Spring Boot Monolith (salofresh-backend.jar, embedded Tomcat)"
+        subgraph "Filter chain"
+            RL[RateLimitingFilter<br/>Bucket4j, /api/v1/auth/**]
+            JWT[JwtAuthenticationFilter<br/>parse+validate JWT, blacklist check]
+        end
+        subgraph "Web layer"
+            C[71 Controllers<br/>@Valid DTOs, @PreAuthorize]
+            WS[STOMP WebSocket /ws<br/>StompAuthChannelInterceptor]
+            WH[PaymentWebhookController<br/>HMAC signature check]
+        end
+        subgraph "Service layer"
+            S[Service impls<br/>@Transactional business logic]
+            EV((ApplicationEventPublisher))
+            L[Async listeners<br/>AFTER_COMMIT, taskExecutor 5..20]
+            SCH[Schedulers<br/>fraud / campaigns / waitlist]
+        end
+        subgraph "Data access"
+            R[71 Spring Data repositories<br/>+ Specifications]
+            CA[(Caffeine caches<br/>9 caches, 15m TTL)]
+        end
+    end
+
+    subgraph External
+        DB[(MySQL<br/>72 tables, Flyway V1..V5)]
+        FCM[FCM push] SMTP[SMTP] TW[Twilio/WhatsApp]
+        FS[(Local disk ./uploads)]
+    end
+
+    MOB --> RL --> JWT --> C --> S
+    MOB -.STOMP.-> WS --> S
+    GW -->|webhooks| WH --> S
+    S --> R --> DB
+    S --> CA
+    S --> EV --> L
+    L --> FCM & SMTP & TW
+    S --> FS
+    SCH --> S
+```
+
+COMPONENT RESPONSIBILITIES:
+- RateLimitingFilter: registered BEFORE UsernamePasswordAuthenticationFilter
+  in SecurityConfig.filterChain(); throttles brute-force on auth endpoints;
+  returns 429 with the standard ApiResponse JSON envelope.
+- JwtAuthenticationFilter (OncePerRequestFilter, added AFTER the rate
+  limiter): extracts Bearer token, JwtTokenProvider.validateToken(), asserts
+  tokenType==ACCESS, checks blacklisted_tokens by jti, loads UserPrincipal via
+  CustomUserDetailsService.loadUserById(), populates SecurityContextHolder.
+- SecurityConfig: stateless sessions, CSRF disabled (JWT, no cookies), CORS
+  from CorsConfig (app.cors.allowed-origins), PUBLIC_ENDPOINTS permitAll,
+  everything else authenticated; OAuth2 login wiring; custom 401/403 handlers
+  (CustomAuthenticationEntryPoint / CustomAccessDeniedHandler) that emit the
+  same ApiResponse error shape as GlobalExceptionHandler.
+- Services: own transaction boundaries; enforce ownership; publish events.
+- Listeners: NotificationEventListener (email/SMS/push/WhatsApp fan-out per
+  event type), InventoryDeductionListener (BookingCompletedEvent -> deduct
+  product stock per service_product_usage), WaitlistNotifierListener
+  (BookingCancelledEvent -> notify matching waitlist entries). All are
+  @Async + AFTER_COMMIT + fallbackExecution=true.
+- Schedulers: FraudDetectionScheduler (hourly), CampaignDispatchScheduler,
+  WaitlistCleanupScheduler.
+
+================================================================================
+ 7. ARCHITECTURE DECISIONS (WHY THIS AND NOT SOMETHING ELSE)
+================================================================================
+
+| Decision        | Chosen                              | Alternative                | Why chosen here |
+|-----------------|-------------------------------------|----------------------------|-----------------|
+| Deployment unit | Modular monolith                    | Microservices              | One team/one codebase; bookings+payments+wallet need ACID transactions that are trivial in one DB and painful (sagas) across services; feature-packaged layout keeps future extraction cheap |
+| Database        | MySQL (relational)                  | MongoDB / DynamoDB         | 72 highly relational tables, FK integrity, multi-row money transactions (payment + transaction + wallet + payout) demand ACID |
+| Schema mgmt     | Flyway versioned SQL                | Liquibase / hibernate ddl  | Raw SQL control, reviewable diffs, test-verified (FlywayMigrationTest); ddl-auto in prod is set to `validate` so Hibernate can never mutate schema |
+| Auth            | Stateless JWT (HS256) + refresh rotation + jti blacklist | Server sessions / opaque tokens in Redis | No session affinity needed; mobile-friendly; blacklist table restores revocability that pure JWT lacks |
+| Social login    | Spring OAuth2 client (Google)       | Hand-rolled token exchange | Battle-tested handshake; CustomOAuth2UserService just links/creates the local user |
+| AuthZ           | @PreAuthorize roles + in-service ownership checks | URL-pattern rules only | Roles alone can't express "owner of THIS salon"; services compare SecurityUtils.getCurrentUserId() to the aggregate's owner and throw ForbiddenException |
+| Async           | In-JVM events + @Async AFTER_COMMIT | Kafka/RabbitMQ             | Zero infra cost; AFTER_COMMIT prevents ghost notifications for rolled-back writes. Cost: not durable, single-node only (see §17) |
+| Cache           | Caffeine in-process                 | Redis                      | Single instance today -> no network hop, no extra infra; 15m TTL bounds staleness. Redis becomes mandatory at >1 instance |
+| Rate limiting   | Bucket4j in-memory on /auth/**      | Redis-backed / API gateway | Protects the actual attack surface (credential stuffing) with zero infra; per-instance only |
+| API style       | REST + OpenAPI, /api/v1 path version| GraphQL / gRPC             | CRUD-shaped domain, simple client contracts, Swagger for free |
+| Mapping         | MapStruct compile-time mappers      | Manual / ModelMapper       | Compile-time safety and zero reflection cost across ~70 DTO families (admin module deliberately uses manual mapping for small DTOs) |
+| Files           | Local disk ./uploads                | S3/GCS                     | Single-node simplicity; explicitly the first thing to replace when scaling out |
+| Payments        | Gateway interface + 2 impls          | Single hardcoded gateway   | PaymentGateway Strategy lets Razorpay (India) and Stripe (intl.) coexist; webhooks reconcile asynchronously |
+
+WHEN THE CHOSEN ARCHITECTURE STOPS BEING SUITABLE:
+- >1 app instance: Caffeine caches diverge, Bucket4j limits become per-node,
+  local file storage breaks, in-JVM events only fire on the node that took
+  the write, and the STOMP simple broker can't share sessions. The upgrade
+  path is: Redis (cache + rate limit + STOMP relay), S3 (files), and a real
+  broker (events) — none of which requires re-architecting the modules.
+- Team growth past ~2-3 squads or divergent scaling needs (e.g. search/read
+  traffic dwarfing booking writes): extract the hottest feature package
+  (already vertically separated) into its own service.
+
+================================================================================
+ 8. COMPLETE REQUEST FLOWS (5 TRACED APIS)
+================================================================================
+
+Generic pipeline (no LB/gateway exists in this repo — clients hit embedded
+Tomcat directly):
+
+  Client -> Tomcat -> Security filter chain
+    [CorsFilter -> RateLimitingFilter -> JwtAuthenticationFilter ->
+     authorizeHttpRequests] -> DispatcherServlet ->
+  Controller (@Valid binding) -> @PreAuthorize check -> Service
+  (@Transactional) -> Repositories/Hibernate -> MySQL -> commit ->
+  AFTER_COMMIT async listeners -> MapStruct DTO -> ApiResponse<T> JSON.
+  Any exception -> GlobalExceptionHandler -> ApiResponse.error(...).
+
+--------------------------------------------------------------------------------
+FLOW 1 — LOGIN: POST /api/v1/auth/login
+--------------------------------------------------------------------------------
+1. RateLimitingFilter: URI starts with /api/v1/auth/ -> consume 1 token from
+   the bucket keyed "clientIp:/api/v1/auth/login" (20 req/60 s). Empty bucket
+   -> HTTP 429 immediately, request never reaches the controller.
+2. JwtAuthenticationFilter: no bearer token -> pass through anonymously.
+3. Authorization: /api/v1/auth/** is in SecurityConstants.PUBLIC_ENDPOINTS ->
+   permitAll.
+4. AuthController.login(@Valid LoginRequest) -> AuthServiceImpl.login()
+   (@Transactional):
+   - UserRepository.findByEmailIgnoreCaseAndDeletedFalse(email)
+   - lockout check: accountLockedUntil in future -> AccountLockedException
+   - BCryptPasswordEncoder(12).matches(raw, hash); on failure increments
+     failedLoginAttempts; at 5 sets accountLockedUntil = now + 30 min
+     (app.security.*) and publishes AccountLockedEvent
+   - on success: reset counters, set lastLoginAt, insert login_history row
+   - TokenIssuanceService issues a TokenPair: access JWT (15 min; claims
+     userId, email, roles, tokenType=ACCESS, jti) + refresh JWT persisted in
+     refresh_tokens
+5. Response: 200 ApiResponse{success:true, data:{accessToken, refreshToken,
+   user...}}. Wrong password -> 401 via GlobalExceptionHandler
+   (BadCredentialsException handler).
+6. Transaction boundary: the whole login mutation (counters, history, refresh
+   token row) is one transaction.
+
+--------------------------------------------------------------------------------
+FLOW 2 — CREATE BOOKING: POST /api/v1/bookings   (the core business API)
+--------------------------------------------------------------------------------
+1. Filters: rate limiter skips (not /auth), JwtAuthenticationFilter validates
+   the access token, checks tokenType==ACCESS, checks
+   BlacklistedTokenRepository.existsByTokenId(jti)  (NOTE: this is a DB read
+   on EVERY authenticated request — see §19), loads UserPrincipal, sets
+   SecurityContext.
+2. BookingController -> @Valid CreateBookingRequest (salonId, optional
+   employeeId, serviceIds, date, startTime, coupon, familyMemberId, ...).
+3. BookingServiceImpl.createBooking() — @Transactional
+   (src/main/java/com/salofresh/service/impl/booking/BookingServiceImpl.java:87):
+   a. Load customer (from SecurityUtils.getCurrentUserId()), salon
+      (filter !deleted), employee via
+      findByIdAndSalonIdAndDeletedFalse (prevents cross-salon employee
+      injection), each service via findByIdAndSalonIdAndDeletedFalse.
+   b. Compute duration & end time from service durations + buffer.
+   c. SlotAvailabilityServiceImpl.validateSlot(): salon accepting bookings?
+      not a holiday? inside working_hours? not overlapping break? employee
+      active, scheduled that weekday, not on leave, and — critically —
+      appointmentRepository conflict query for overlapping non-cancelled
+      appointments; any violation throws SlotUnavailableException (HTTP 409
+      family via ErrorCode.SLOT_UNAVAILABLE).
+   d. Price: sum service prices, apply coupon (CouponUsage limits), GST
+      (AppConstants.DEFAULT_GST_PERCENTAGE 18.0) -> totalAmount,
+      discountAmount, taxAmount, finalAmount.
+   e. Persist Appointment (bookingNumber = "BK" + unique suffix, status
+      PENDING) + appointment_services line items (price snapshot per
+      service) + a PENDING Payment row.
+   f. eventPublisher.publishEvent(new BookingCreatedEvent(...)).
+4. COMMIT -> only then NotificationEventListener (AFTER_COMMIT, async pool
+   "SaloFresh-Async-") sends confirmation email/push/WhatsApp and persists a
+   notifications row. A rollback means no notification — that is exactly why
+   AFTER_COMMIT was chosen.
+5. Response: 201/200 ApiResponse<AppointmentResponse> via AppointmentMapper.
+KNOWN WEAKNESS (be ready to say this in an interview): step 3c is
+check-then-act. Two concurrent requests for the same slot can both pass
+validation and both insert — there is no unique DB constraint on
+(employee_id, appointment_date, start_time) and no pessimistic lock. See §15
+and §26 for the fix options.
+
+--------------------------------------------------------------------------------
+FLOW 3 — CONFIRM PAYMENT: POST /api/v1/payments/{paymentId}/confirm
+--------------------------------------------------------------------------------
+1. Authenticated as above. PaymentController -> @Valid ConfirmPaymentRequest
+   (gatewayPaymentId, gatewaySignature).
+2. PaymentServiceImpl.confirm() — @Transactional:
+   - loads Payment, asserts caller owns it (ForbiddenException otherwise) and
+     it is PENDING (guards double-confirm: re-confirming a SUCCESS payment is
+     rejected -> practical idempotency at the state-machine level);
+   - Strategy dispatch: RazorpayPaymentGatewayImpl.verifyPayment() recomputes
+     HMAC-SHA256 over "orderId|paymentId" with the key secret and compares to
+     the client-supplied signature (StripePaymentGatewayImpl analogous);
+   - success: Payment SUCCESS, Transaction ledger row (TXN prefix), booking
+     -> CONFIRMED, publishes PaymentSuccessEvent; failure: FAILED +
+     PaymentFailedEvent + PaymentException.
+3. AFTER_COMMIT: NotificationEventListener sends receipt; reward points
+   credited via RewardPointsEarnedEvent path.
+4. Independently, the gateway later calls POST /api/v1/webhooks/razorpay
+   (public, HMAC-verified with a SEPARATE webhook secret,
+   WebhookSignatureVerifierImpl). PaymentWebhookServiceImpl is idempotent:
+   existsByEventId short-circuits duplicates; reconciliation only flips
+   still-PENDING payments; internal errors mark webhook_event_logs FAILED but
+   still return 200 so the gateway doesn't retry-storm.
+
+--------------------------------------------------------------------------------
+FLOW 4 — ADMIN APPROVES A SALON: PUT /api/v1/admin/salons/{id}/approve
+--------------------------------------------------------------------------------
+1. JWT filter authenticates; AdminSalonController is class-annotated
+   @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')") — a CUSTOMER token gets
+   403 from CustomAccessDeniedHandler before any service code runs.
+2. AdminSalonServiceImpl.approve() — @Transactional: load salon or
+   ResourceNotFoundException; set VerificationStatus.APPROVED; save; write an
+   audit_logs row via AuditLogRepository (entityName="Salon", action=
+   "APPROVE", performedBy=admin id — the compliance trail every admin
+   mutation in the codebase follows); publish SalonApprovedEvent.
+3. AFTER_COMMIT listener notifies the owner. Response: SalonModerationResponse.
+
+--------------------------------------------------------------------------------
+FLOW 5 — MAKER-CHECKER APPROVAL: PUT /api/v1/admin/approvals/{id}/approve
+--------------------------------------------------------------------------------
+1. Endpoint requires hasRole('SUPER_ADMIN') (AdminApprovalRequestController).
+2. ApprovalRequestServiceImpl.approveAndExecute() — @Transactional:
+   - load ApprovalRequest; must be PENDING else BadRequestException;
+   - SELF-APPROVAL GUARD: requestedBy.id == checkerUserId ->
+     ForbiddenException("You cannot approve your own request");
+   - deserialize the stored JSON payload (Jackson ObjectMapper) and dispatch
+     by ApprovalActionType: SALON_SUSPENSION -> AdminSalonService.suspend(),
+     USER_BAN -> AdminUserService.suspendUser(), LARGE_REFUND -> existing
+     RefundService.initiateRefund() (full gateway refund path reused),
+     PAYOUT_OVERRIDE -> best-effort SalonPayout field update (commented TODO);
+   - only AFTER successful execution: status=EXECUTED, decidedBy, decidedAt.
+     If execution throws, the exception propagates, the transaction rolls
+     back, and the request STAYS PENDING for retry — deliberate design so a
+     failed execution never records a false "approved & executed" state.
+
+================================================================================
+ 9. API DESIGN & DOCUMENTATION
+================================================================================
+
+Conventions applied uniformly across all 274 endpoints:
+- Base path /api/v1 (AppConstants.API_BASE_PATH) — URI versioning.
+- Response envelope: ApiResponse<T>{success, message, timestamp, data,
+  errors[ErrorDetail{field,message,code}]} — same shape for success, error,
+  401, 403 and 429 (the security handlers and RateLimitingFilter reuse it).
+- Pagination: Spring Pageable everywhere (default page size 20, hard max 100
+  from spring.data.web.pageable), returned as PagedResponse<T>{content,
+  pageNumber, pageSize, totalElements, totalPages, first, last}.
+- Validation: Bean Validation on DTOs (@NotBlank/@NotNull/@Size/@Email/
+  @Positive/@DecimalMin...), 400 with per-field ErrorDetail list on failure.
+- Sorting/filtering: sort params via Pageable; dynamic filters via
+  JpaSpecificationExecutor (salon search, admin user/report filters).
+- OpenAPI: every controller carries @Tag, every method @Operation; bearer
+  scheme registered in OpenApiConfig; UI at /swagger-ui.html.
+
+MOST IMPORTANT ENDPOINTS (representative of the 274):
+
+| Method | Endpoint                                   | Purpose                     | Auth        | Roles |
+|--------|--------------------------------------------|-----------------------------|-------------|-------|
+| POST   | /api/v1/auth/register                      | Create account + OTP        | Public (rate-limited) | — |
+| POST   | /api/v1/auth/login                         | Issue JWT pair              | Public (rate-limited) | — |
+| POST   | /api/v1/auth/refresh                       | Rotate refresh token        | Public      | — |
+| POST   | /api/v1/auth/logout                        | Blacklist access jti + revoke refresh | Bearer | any |
+| GET    | /api/v1/salons                             | Search salons (spec filter) | Public      | — |
+| GET    | /api/v1/salons/{id}/slots                  | Available slots for a date  | Public      | — |
+| POST   | /api/v1/bookings                           | Create booking              | Bearer      | CUSTOMER |
+| PUT    | /api/v1/bookings/{id}/cancel               | Cancel + waitlist trigger   | Bearer      | owner-of-booking |
+| POST   | /api/v1/payments/{id}/confirm              | Verify gateway signature    | Bearer      | payer |
+| POST   | /api/v1/wallet/topup                       | Wallet top-up               | Bearer      | any |
+| POST   | /api/v1/salons/{id}/reviews (via ReviewController) | Post review        | Bearer      | CUSTOMER |
+| GET    | /api/v1/owners/me/dashboard/branches       | Multi-branch comparison     | Bearer      | SALON_OWNER |
+| POST   | /api/v1/platform-billing/subscribe         | Owner buys platform plan    | Bearer      | SALON_OWNER |
+| PUT    | /api/v1/admin/salons/{id}/approve          | Approve salon               | Bearer      | ADMIN/SUPER_ADMIN |
+| PUT    | /api/v1/admin/reviews/{id}/moderate        | Hide/restore review         | Bearer      | ADMIN/SUPER_ADMIN |
+| GET    | /api/v1/admin/audit-logs                   | Audit trail viewer          | Bearer      | ADMIN/SUPER_ADMIN |
+| PUT    | /api/v1/admin/roles/{id}/permissions       | Replace role permission set | Bearer      | SUPER_ADMIN only |
+| PUT    | /api/v1/admin/approvals/{id}/approve       | Maker-checker execute       | Bearer      | SUPER_ADMIN only |
+| POST   | /api/v1/webhooks/razorpay|stripe           | Gateway webhook             | Public + HMAC | — |
+| GET    | /api/v1/gift-cards/{code}/balance          | Gift card balance           | Public      | — |
+| POST   | /api/v1/support/tickets                    | Raise support ticket        | Bearer      | any |
+| POST   | /api/v1/privacy/requests                   | GDPR export/delete request  | Bearer      | any |
+| GET    | /api/v1/admin/bulk/users/export            | CSV export                  | Bearer      | ADMIN/SUPER_ADMIN |
+
+GAPS TO ADMIT HONESTLY:
+- No Idempotency-Key header support on POST /bookings or /payments/initiate
+  (only webhooks and payment-status transitions are idempotent).
+- No HATEOAS, no ETag/conditional requests, no API-level response
+  compression config; versioning is URI-only (fine, but only v1 exists).
+- 201-with-Location is not consistently used; most creates return 200 with
+  the envelope.
+
+================================================================================
+ 10. DATABASE DESIGN
+================================================================================
+
+72 InnoDB tables, all created by Flyway (V1: core 41 tables + geo + seed
+structure; V3: +13 customer tables; V4: +12 owner tables; V5: +7 admin
+tables). 68 explicit secondary indexes. Naming: snake_case tables/columns,
+uk_/fk_/idx_ prefixes.
+
+CONVENTIONS (uniform across nearly every table — from Auditable):
+  created_at (NOT NULL), updated_at, created_by, updated_by (VARCHAR 100,
+  filled by AuditorAwareImpl from the JWT principal, "SYSTEM" for anonymous),
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE  -> SOFT DELETE everywhere.
+  PKs: BIGINT AUTO_INCREMENT surrogate keys throughout.
+  Money: DECIMAL(12,2) / DECIMAL(10,2); percentages DECIMAL(5,2).
+  Enums: VARCHAR + @Enumerated(EnumType.STRING) — readable, reorder-safe.
+  Times: TIMESTAMP (UTC, java.time.Instant), business dates DATE/TIME.
+  Version column: ONLY wallet has `version` BIGINT (@Version optimistic lock).
+
+CORE ER DIAGRAM (central slice of the 72 tables):
+
+```mermaid
+erDiagram
+    USERS ||--o{ USER_ROLES : has
+    ROLES ||--o{ USER_ROLES : grants
+    ROLES ||--o{ ROLE_PERMISSIONS : contains
+    PERMISSIONS ||--o{ ROLE_PERMISSIONS : in
+    USERS ||--o| CUSTOMERS : "profile"
+    USERS ||--o| SALON_OWNERS : "profile"
+    USERS ||--o| WALLET : "1:1 unique user_id"
+    WALLET ||--o{ WALLET_TRANSACTIONS : records
+    SALON_OWNERS ||--o{ SALONS : owns
+    SALONS ||--o{ EMPLOYEES : employs
+    SALONS ||--o{ SERVICES : offers
+    CATEGORIES ||--o{ SERVICES : classifies
+    SALONS ||--o{ WORKING_HOURS : opens
+    SALONS ||--o{ HOLIDAYS : closes
+    EMPLOYEES ||--o{ EMPLOYEE_SCHEDULE : works
+    EMPLOYEES ||--o{ EMPLOYEE_LEAVE : takes
+    USERS ||--o{ APPOINTMENTS : books
+    SALONS ||--o{ APPOINTMENTS : hosts
+    EMPLOYEES ||--o{ APPOINTMENTS : serves
+    FAMILY_MEMBERS ||--o{ APPOINTMENTS : "booked for"
+    APPOINTMENTS ||--|{ APPOINTMENT_SERVICES : "line items"
+    SERVICES ||--o{ APPOINTMENT_SERVICES : priced
+    APPOINTMENTS ||--o{ PAYMENTS : "paid by"
+    PAYMENTS ||--o{ REFUNDS : reversed
+    PAYMENTS ||--o{ TRANSACTIONS : ledger
+    USERS ||--o{ REVIEWS : writes
+    SALONS ||--o{ REVIEWS : receives
+    REVIEWS ||--o{ REVIEW_IMAGES : has
+    COUPONS ||--o{ COUPON_USAGE : redeemed
+    SALONS ||--o{ SALON_PAYOUTS : "settled via"
+    PLATFORM_PLANS ||--o{ PLATFORM_SUBSCRIPTIONS : sold
+    SALON_OWNERS ||--o{ PLATFORM_SUBSCRIPTIONS : buys
+    USERS ||--o{ SUPPORT_TICKETS : raises
+    SUPPORT_TICKETS ||--|{ TICKET_MESSAGES : thread
+    USERS ||--o{ DATA_SUBJECT_REQUESTS : files
+    USERS ||--o{ APPROVAL_REQUESTS : makes
+```
+
+RELATIONSHIP TYPES PRESENT:
+- 1:1  — users↔wallet (unique user_id FK), users↔customers, users↔salon_owners
+- 1:N  — the dominant shape (salon→appointments, ticket→messages, ...)
+- M:N  — user_roles, role_permissions, employee_services (explicit join
+  tables; user_roles/role_permissions mapped as @ManyToMany, others as
+  entities where the join carries data, e.g. appointment_services holds a
+  PRICE SNAPSHOT — deliberate denormalization, see §11)
+
+KEY TABLE DETAIL — users (V1__init_schema.sql):
+  id PK; email UNIQUE NOT NULL; phone UNIQUE; password NULLABLE (OAuth users
+  have none); auth_provider (LOCAL/GOOGLE) + provider_id;
+  email_verified/phone_verified; account_status; failed_login_attempts,
+  account_locked_until (lockout state lives IN the row -> survives restart);
+  referral_code UNIQUE, referred_by_code; audit columns; is_deleted.
+
+SECURITY TABLES: refresh_tokens (token value, user FK, expiry, revoked flag),
+blacklisted_tokens (jti UNIQUE + expiry — logout revocation),
+otp (code, purpose, expiry, attempts), login_history.
+
+MONEY SPINE: appointments -> payments (gateway_order_id, gateway_payment_id,
+payment_status) -> transactions (ledger, TXN numbers) -> refunds; wallet +
+wallet_transactions; salon_payouts (gross, commission, net); reward_points;
+gift_cards (unique code, balance); coupon_usage (per-user redemption count).
+
+INDEX EXAMPLES (all in migrations): idx_appointments on (salon_id,
+appointment_date), employee/date, customer; idx_support_tickets_status;
+idx_fraud_alerts_status(status, detected_at); idx_data_subject_requests_user;
+uk_webhook_event_logs_event_id (idempotency); uk_feature_flags_key.
+
+================================================================================
+ 11. DATABASE DESIGN DECISIONS
+================================================================================
+
+1. SURROGATE BIGINT PKs everywhere — stable joins, small index keys, no
+   natural-key churn. Business identifiers that humans see are separate
+   UNIQUE columns (booking_number, referral_code, gift card code, event_id).
+   Alternative UUIDs: better for multi-node generation/no enumeration risk,
+   but 16-byte random keys fragment InnoDB clustered indexes; AUTO_INCREMENT
+   is fine for a single-writer monolith. (Enumeration risk is mitigated by
+   ownership checks, not by ID obscurity.)
+
+2. SOFT DELETE (is_deleted) instead of hard DELETE — bookings/payments/
+   reviews are legally and financially significant; hard deletes would break
+   FK chains and audit history. Cost: EVERY query must filter (repos use
+   ...AndDeletedFalse conventions or spec filters); a missed filter is a data
+   leak (see §27 for where this is a real risk); unique constraints keep
+   "deleted" rows occupying the keyspace (e.g. a soft-deleted user still
+   holds the email — re-registration with the same email fails by design).
+   GDPR deletion therefore ALSO anonymizes nullable PII columns
+   (DataSubjectRequestServiceImpl nulls phone/password/profile_image_url).
+
+3. PRICE SNAPSHOT DENORMALIZATION — appointment_services stores the service
+   price AT BOOKING TIME; payments/payouts store computed amounts. If a salon
+   edits a price later, history doesn't rewrite itself. This is deliberate
+   denormalization on an otherwise ~3NF schema.
+
+4. ENUMS AS STRINGS (EnumType.STRING everywhere) — ORDINAL would silently
+   corrupt data if an enum constant is reordered; strings are debuggable in
+   raw SQL at the cost of a few bytes.
+
+5. LOCKOUT & TOKEN STATE IN THE DB (not memory) — failed_login_attempts /
+   account_locked_until on users, refresh_tokens and blacklisted_tokens as
+   tables: survives restarts and would remain correct across multiple
+   instances (unlike the in-memory rate limiter).
+
+6. IDEMPOTENCY BY UNIQUE CONSTRAINT — webhook_event_logs.event_id UNIQUE is
+   the hard guarantee that a replayed gateway webhook can't double-process;
+   the existsByEventId check is just the fast path, the constraint is the
+   backstop under concurrency.
+
+7. RESERVED-WORD DISCIPLINE — commission_rules.rule_value and
+   feature_flags.flag_key/flag_value exist because VALUE/KEY are reserved
+   words in H2/MySQL; the entity fields keep clean Java names with explicit
+   @Column(name=...) mappings. (This was found by an actual H2 test failure
+   during development — a good "real war story" for interviews.)
+
+8. CONCURRENCY — wallet.version (@Version) makes concurrent balance updates
+   fail-fast (optimistic lock) instead of losing updates. Appointments have
+   NO equivalent guard — acknowledged gap (§15).
+
+MISSING / IMPROVABLE (honest list):
+- No composite UNIQUE on appointments(employee_id, appointment_date,
+  start_time) WHERE status active — the single biggest correctness gap.
+- audit_logs old/new values are LOBs with no retention/partitioning plan —
+  will grow unboundedly.
+- No index on users.referred_by_code despite the fraud query grouping by it.
+- No table partitioning; notifications/email_logs/sms_logs/whatsapp_logs are
+  append-heavy and will need archival policy.
+
+================================================================================
+ 12. SECURITY DEEP DIVE
+================================================================================
+
+AUTHENTICATION PIPELINE (exact order from SecurityConfig.filterChain):
+  CORS (CorsConfigurationSource from app.cors.allowed-origins)
+  -> RateLimitingFilter (before UsernamePasswordAuthenticationFilter)
+  -> JwtAuthenticationFilter (after RateLimitingFilter)
+  -> authorizeHttpRequests: PUBLIC_ENDPOINTS permitAll, anyRequest().authenticated()
+  -> @PreAuthorize at controller/method level (@EnableMethodSecurity)
+  -> in-service ownership checks (SecurityUtils + ForbiddenException)
+  Session policy STATELESS; CSRF disabled (no cookie-based session to forge —
+  correct for pure bearer-token APIs); custom entry point/denied handler emit
+  ApiResponse JSON for 401/403.
+
+TOKENS (JwtTokenProvider):
+- HS256 symmetric, key from app.jwt.secret (env JWT_SECRET; a base64 fallback
+  IS hardcoded in application.yml — flagged CRITICAL in §27).
+- Access token: 15 min (900000 ms), claims: sub=userId, email, roles,
+  tokenType=ACCESS, jti (UUID), issuer "salofresh".
+- Refresh token: 7 d / 30 d rememberMe, tokenType=REFRESH, persisted in
+  refresh_tokens; /auth/refresh rotates it (old row revoked, new issued) —
+  refresh reuse after rotation fails (TokenRefreshException).
+- Logout: access jti -> blacklisted_tokens; refresh row revoked. The filter
+  rejects blacklisted jtis, so logout is REAL revocation (unlike naive JWT).
+  Trade-off: one DB existsByTokenId per authenticated request (a natural
+  Redis/Caffeine optimization — currently a deliberate simplicity choice).
+
+PASSWORDS: BCryptPasswordEncoder(12) (PasswordEncoderConfig) — cost 12,
+per-password salt. Passwords never logged or returned (User DTOs exclude it;
+Jackson non_null + dedicated response DTOs). The V2 seed admin
+(admin@salofresh.com) stores a real generated $2a$12$ hash.
+
+OAUTH2 (Google): CustomOAuth2UserService maps the Google profile to a local
+users row (auth_provider=GOOGLE, provider_id), links by email if the account
+exists; OAuth2LoginSuccessHandler issues the SAME JWT pair and redirects to
+app.frontend-url with tokens; password column stays NULL for such users.
+
+BRUTE FORCE: two independent layers — Bucket4j 429s at 20 req/min/IP on
+/api/v1/auth/**, and per-account lockout (5 fails -> 30 min lock persisted on
+the users row) with AccountLockedException surfaced as 423-style error.
+
+INJECTION & XSS: All SQL goes through JPA/Hibernate bound parameters (derived
+queries, @Query with :params, Specifications) — no string-concatenated SQL
+anywhere; SQL injection surface ~zero. XSS: API returns JSON only and never
+echoes HTML; output encoding is the (absent) frontend's job; stored strings
+are size-bounded by Bean Validation but NOT sanitized — a rich-text field
+rendered naively by a client could still XSS (documented risk, LOW for a
+JSON API).
+
+FILE UPLOAD: extension whitelist jpg/jpeg/png/pdf + 5 MB cap (app.file.*,
+multipart limits). Uploads served statically at /files/** which is PUBLIC —
+gallery images are meant to be public, but sensitive documents (salon KYC
+docs) sharing that path is a MEDIUM finding (§27).
+
+WEBHOOK SECURITY: endpoints are anonymous by necessity (gateways can't hold
+JWTs) — the control is cryptographic instead: WebhookSignatureVerifierImpl
+recomputes HMAC-SHA256 (Razorpay: raw body; Stripe: "t.{body}" from the
+Stripe-Signature header) with dedicated webhook secrets; blank secret =>
+verification returns false => 403. Idempotency via unique event_id.
+
+STOMP/WebSocket: StompAuthChannelInterceptor validates the JWT on CONNECT and
+binds a StompPrincipal, so chat frames are authenticated too.
+
+SECRETS MANAGEMENT: everything externalized as ${ENV_VAR:default} in YAML;
+prod datasource has NO defaults (fails fast without env). Weakness: dev
+fallbacks for JWT secret and mail password sit in the committed YAML (§27).
+
+AUTHORIZATION MODEL SUMMARY:
+  5 roles (RoleName): SUPER_ADMIN, ADMIN, SALON_OWNER, EMPLOYEE, CUSTOMER
+  + permissions catalog (role_permissions) manageable at runtime by
+  SUPER_ADMIN (AdminRoleServiceImpl) — though enforcement today is
+  role-based via hasRole; permissions are managed but not yet checked by
+  @PreAuthorize("hasAuthority(...)") — honest gap: PARTIALLY IMPLEMENTED
+  (management UI-ready, enforcement still coarse-grained).
+  Escalating strictness: ADMIN endpoints -> hasAnyRole('ADMIN','SUPER_ADMIN');
+  role/permission editing and maker-checker approval -> SUPER_ADMIN only.
+
+================================================================================
+ 13. DESIGN PATTERNS (ONLY THOSE ACTUALLY IN THE CODE)
+================================================================================
+
+STRATEGY — PaymentGateway interface with RazorpayPaymentGatewayImpl and
+  StripePaymentGatewayImpl (service/impl/payment/). PaymentServiceImpl picks
+  the implementation by PaymentMethod at runtime. Problem solved: adding a
+  gateway = one new class, no change to payment orchestration (also OCP
+  evidence). Similar: SMS/WhatsApp "provider" switch (console vs Twilio/Meta).
+  Interview line: "signature verification and order creation vary per
+  gateway; the booking/payment state machine doesn't — Strategy isolates the
+  varying part."
+
+REPOSITORY — 71 Spring Data interfaces (framework-provided pattern, but the
+  project leans on it properly: derived queries encode the soft-delete filter
+  in names like findByIdAndSalonIdAndDeletedFalse).
+
+SPECIFICATION — com.salofresh.specification (SalonSpecification,
+  ReviewSpecification) + JpaSpecificationExecutor on SalonRepository,
+  UserRepository, ReviewRepository, SupportTicketRepository: composable
+  dynamic WHERE clauses for search/filter endpoints instead of a
+  combinatorial explosion of finder methods.
+
+OBSERVER / DOMAIN EVENTS — ApplicationEventPublisher + 19 event classes +
+  three @TransactionalEventListener consumers. Publishers don't know about
+  email/push/stock logic; new side effects are new listeners. This is the
+  project's core decoupling mechanism.
+
+TEMPLATE-METHOD-ish BASE CLASS — Auditable @MappedSuperclass +
+  AuditingEntityListener: cross-cutting audit columns inherited by ~68
+  entities (strictly speaking this is the JPA entity-listener callback
+  pattern, not GoF Template Method — say so if pressed).
+
+BUILDER — Lombok @Builder on entities/DTOs (ApiResponse.builder() etc.).
+  Generated, but used pervasively for readable object construction.
+
+FACADE — service impls like BookingServiceImpl act as facades over 8+
+  repositories + slot engine + coupon engine + event publishing: the
+  controller sees one createBooking() call.
+
+DTO + MAPPER — full request/response DTO isolation (dto/**), MapStruct
+  compile-time mappers (mapper/**, componentModel="spring"). Entities never
+  leave the service layer — prevents lazy-loading serialization accidents
+  (works with open-in-view=false) and hides internal columns.
+
+CHAIN OF RESPONSIBILITY — the servlet security filter chain itself
+  (RateLimitingFilter -> JwtAuthenticationFilter -> authorization): each
+  filter decides to handle/reject/pass.
+
+SINGLETON — Spring's default bean scope (containers-managed; don't oversell
+  it as a hand-written pattern).
+
+DEPENDENCY INJECTION — constructor injection everywhere via Lombok
+  @RequiredArgsConstructor + final fields; no field @Autowired. Testable
+  (the Mockito tests construct impls with mocks directly).
+
+MAKER-CHECKER (domain/workflow pattern, not GoF) —
+  ApprovalRequestServiceImpl: four-eyes principle encoded in code.
+
+HONESTLY NOT PRESENT: Factory (no dedicated factories beyond Spring),
+Adapter/Proxy (only Spring's internal AOP proxies for @Transactional/@Async/
+@Cacheable — you should be able to EXPLAIN those proxies exist), Circuit
+Breaker, Retry (no Resilience4j), Saga, Outbox, CQRS.
+NOT IMPLEMENTED IN CURRENT PROJECT — and the Outbox absence matters: events
+are fire-and-forget in-JVM (see §17).
+
+================================================================================
+ 14. SOLID ANALYSIS (WITH REAL CLASSES)
+================================================================================
+
+S — FOLLOWED: channel senders are split (EmailServiceImpl, SmsServiceImpl,
+  WhatsAppServiceImpl, FirebaseCloudMessagingServiceImpl — one transport
+  each); JwtTokenProvider only mints/parses tokens while TokenIssuanceService
+  orchestrates issuance; SlotAvailabilityServiceImpl only computes/validates
+  slots, BookingServiceImpl only orchestrates bookings.
+  VIOLATED: BookingServiceImpl and PaymentServiceImpl are large multi-concern
+  orchestrators (pricing + persistence + coupons + events in one class);
+  AuthServiceImpl similarly (register+login+OTP+lockout+refresh). Improvement:
+  extract PricingService / LockoutPolicy collaborators.
+
+O — FOLLOWED: PaymentGateway (new gateway w/o touching PaymentServiceImpl);
+  event listeners (new side effect w/o touching publishers); Specifications
+  (new filters compose).
+  VIOLATED: NotificationEventListener switches behavior per event type in one
+  class — a new event usually means editing it; SecurityConstants.
+  PUBLIC_ENDPOINTS is a hand-maintained array every new public endpoint must
+  edit (in this project's history it was the #1 merge-conflict file).
+
+L — FOLLOWED: any PaymentGateway impl is substitutable in PaymentServiceImpl;
+  all repository interfaces honor Spring Data contracts. No inheritance
+  hierarchies deep enough to create classic LSP traps; BaseException subtypes
+  all behave uniformly in GlobalExceptionHandler.
+
+I — FOLLOWED: per-feature service interfaces are narrow (SlotAvailabilityService
+  has 2-3 methods; FeatureFlagQueryService only reads, AdminFeatureFlagService
+  only writes — a textbook read/write interface split).
+  MINOR VIOLATION: some owner-facing service interfaces bundle 8-10 loosely
+  related methods (e.g. BookingService covers customer + owner actions);
+  could split BookingCommandService/BookingQueryService.
+
+D — FOLLOWED: controllers depend on service INTERFACES; PaymentServiceImpl
+  depends on the PaymentGateway abstraction; DI is constructor-based.
+  VIOLATED (by pragmatic choice): services depend on concrete Spring Data
+  repositories and JPA entities — there is no domain layer independent of the
+  framework (i.e., not hexagonal). For a monolith this is a defensible
+  trade-off; say it, don't hide it.
+
+================================================================================
+ 15. TRANSACTIONS & CONCURRENCY
+================================================================================
+
+BOUNDARIES: declarative @Transactional on service methods (writes) and
+@Transactional(readOnly=true) on queries — never on controllers or repos.
+Isolation: DEFAULT everywhere -> MySQL InnoDB REPEATABLE READ. Propagation:
+default REQUIRED (no REQUIRES_NEW/NESTED anywhere).
+Connection pool: HikariCP, prod max 20 / min-idle 5 / 30 s connection timeout
+(application-prod.yml).
+
+OPTIMISTIC LOCKING: ONLY Wallet (@Version private Long version).
+PESSIMISTIC LOCKING: none (no @Lock/PESSIMISTIC anywhere — verified by grep).
+
+THE FOUR CLASSIC INTERVIEW SCENARIOS, ANSWERED FOR THIS CODEBASE:
+
+Q: "Two users update the same record simultaneously?"
+- Wallet: both load version=N; first commit wins and bumps to N+1; second
+  flush throws ObjectOptimisticLockingFailureException -> 500 today (no
+  dedicated handler/retry — an improvement point: catch + retry once or map
+  to 409).
+- Any other entity (e.g. two admins editing a salon): LAST WRITE WINS
+  silently — no version column. Acceptable for profile-ish data, must be
+  called out as a conscious gap for anything financial.
+
+Q: "Two users book the same slot at the same instant?"
+- BookingServiceImpl.createBooking validates availability (SELECT of
+  overlapping appointments) then INSERTs — check-then-act. Under REPEATABLE
+  READ, neither transaction sees the other's uncommitted insert, so BOTH can
+  commit => double booking is POSSIBLE under true concurrency. There is no
+  unique constraint and no lock.
+- Correct fixes (in preference order): (1) UNIQUE index on
+  (employee_id, appointment_date, start_time) + catch
+  DataIntegrityViolationException -> SlotUnavailableException — constraint as
+  arbiter; (2) SELECT ... FOR UPDATE on the employee's day
+  (@Lock(PESSIMISTIC_WRITE)); (3) serializable isolation (throughput cost).
+- This is the single most likely "gotcha" question — own it proactively.
+
+Q: "Same API request submitted three times?"
+- Login: harmless (idempotent by nature). Booking create: three bookings if
+  all pass slot validation for different times, or duplicates for the same
+  slot (no client idempotency key) — WEAKNESS. Payment confirm: safe — the
+  status guard rejects confirming a non-PENDING payment. Webhooks: safe —
+  event_id unique + existsByEventId. Coupon redemption: usage-count checked
+  in the same transaction, small race window comparable to the slot issue.
+
+Q: "App crashes mid-transaction?"
+- InnoDB rolls back the uncommitted transaction — no partial booking/payment
+  rows. BUT: AFTER_COMMIT listeners that had not yet run are LOST FOREVER
+  (in-JVM queue, no persistence): a booking can exist whose confirmation
+  email never sends, or a completed booking whose stock deduction never
+  happened. Mitigation path = Outbox pattern (events written in the same
+  transaction, relayed by a poller). NOT IMPLEMENTED — say so.
+
+THREAD SAFETY NOTES: RateLimitingFilter's ConcurrentHashMap<String,Bucket> is
+thread-safe but UNBOUNDED (memory growth with unique client keys — LOW risk,
+flagged); Caffeine and the async executor are thread-safe by design; services
+are stateless singletons.
+
+================================================================================
+ 16. CACHING
+================================================================================
+
+IMPLEMENTATION: Spring Cache abstraction over Caffeine (in-process).
+- CacheConfig: CaffeineCacheManager with expireAfterWrite=15 MINUTES,
+  maximumSize=2000 entries per cache, 9 named caches (CacheNames class).
+- WHAT is cached and WHY: reference/read-mostly data — categories, geo
+  (countries/states/cities — effectively immutable), salon listings/details
+  and popular salons (read-heavy discovery pages), feature flags (read on
+  hot paths, changed rarely).
+- WHERE: @Cacheable in CategoryServiceImpl, SalonServiceImpl,
+  LocationServiceImpl, and FeatureFlagCacheLoader (a SEPARATE @Component so
+  the @Cacheable call crosses a Spring proxy — self-invocation would silently
+  bypass caching; this subtlety is explicitly handled and commented).
+- PATTERN: cache-aside (read-through on miss); writes evict — e.g.
+  AdminFeatureFlagServiceImpl uses @CacheEvict(cacheNames=FEATURE_FLAGS,
+  allEntries=true) on create/update/delete. allEntries is deliberate: the
+  flag cache stores negative (not-found) results too, so key-scoped eviction
+  could leave a stale "missing" entry after creating a flag.
+- KEYS: method-arg based (flag key string, location ids, salon id/page params).
+- EVICTION: size (2000, W-TinyLFU) + TTL 15 m. TTL is the staleness ceiling
+  for anything evicted imprecisely.
+
+CLASSIC CACHE QUESTIONS FOR THIS SETUP:
+- Consistency: single-node -> evictions are immediate and consistent. At >1
+  node Caffeine becomes N divergent caches (up to 15 min inconsistency) ->
+  the documented trigger to move to Redis.
+- Stampede: on TTL expiry of a hot key, concurrent misses each hit MySQL —
+  Caffeine can mitigate with refreshAfterWrite/LoadingCache; current config
+  doesn't. Real exposure is low (queries behind it are cheap indexed reads).
+- Penetration: feature-flag cache stores misses (Optional-not-found), which
+  blunts repeated lookups of nonexistent keys; other caches don't need it.
+- Cache down: cannot "go down" separately — it's in-heap. Failure mode is
+  memory pressure, bounded by maximumSize.
+- What I would cache NEXT: the per-request blacklist jti lookup (short-TTL
+  Caffeine — jti entries are immutable once written) and salon rating
+  aggregates.
+
+================================================================================
+ 17. MESSAGING / ASYNC PROCESSING
+================================================================================
+
+NO EXTERNAL BROKER — NOT IMPLEMENTED IN CURRENT PROJECT (no Kafka/RabbitMQ/
+SQS in pom.xml). What exists instead:
+
+1. IN-JVM DOMAIN EVENTS: publishers call
+   ApplicationEventPublisher.publishEvent(POJO) inside transactions;
+   consumers are @Async("taskExecutor")
+   @TransactionalEventListener(phase = AFTER_COMMIT, fallbackExecution=true)
+   methods in listener/*. fallbackExecution=true means events published
+   OUTSIDE any transaction (e.g. from schedulers) still fire.
+   TRACE ONE EVENT: BookingServiceImpl.cancelBooking() publishes
+   BookingCancelledEvent -> commit -> WaitlistNotifierListener wakes on the
+   async pool, finds waitlist rows matching salon/date, sends notifications
+   and marks entries notified. Failure inside the listener is logged by
+   AsyncConfig's AsyncUncaughtExceptionHandler and does NOT roll back the
+   cancellation (correct — the cancel already committed).
+2. THREAD POOL: AsyncConfig taskExecutor core 5 / max 20 / queue 500 /
+   prefix "SaloFresh-Async-". Queue full -> AbortPolicy (default) ->
+   RejectedExecutionException at publish site — a latent overload behavior
+   worth knowing.
+3. SCHEDULERS: cron-driven batch work (fraud hourly; campaign dispatch;
+   waitlist cleanup). NOTE: with >1 instance these would run on EVERY node
+   (no ShedLock/leader election) — duplicate campaign sends. Fraud alerts are
+   guarded by existsBy... dedup, campaigns are not.
+
+DELIVERY GUARANTEES, HONESTLY: at-most-once. No retry, no DLQ, no ordering
+guarantees beyond single-listener execution, no persistence — a crash between
+commit and listener execution loses the side effect (§15). Duplicate events
+don't occur in-JVM (single publish), but duplicate EXTERNAL events (webhooks)
+are handled via the event_id unique constraint.
+
+WHERE A BROKER WOULD EARN ITS COST: marketing campaign fan-out (thousands of
+sends -> queue with retry/DLQ), notification delivery (durability), and any
+multi-instance deployment. The event classes already form the message schema
+— migration is mechanical (publish to topic instead of in-JVM bus).
+
+================================================================================
+ 18. ERROR HANDLING
+================================================================================
+
+HIERARCHY: BaseException(message, ErrorCode, HttpStatus) with subtypes:
+ResourceNotFoundException(404), BadRequestException(400),
+UnauthorizedException(401), ForbiddenException(403), ConflictException(409),
+AccountLockedException, TokenRefreshException, OtpException,
+SlotUnavailableException, PaymentException, FileStorageException,
+RateLimitExceededException — each carrying an ErrorCode enum value
+(RESOURCE_NOT_FOUND, SLOT_UNAVAILABLE, PAYMENT_FAILED, ...).
+
+GLOBAL HANDLER: exception/GlobalExceptionHandler (@RestControllerAdvice) with
+16 @ExceptionHandler methods, verified: BaseException (status from the
+exception), MethodArgumentNotValidException + ConstraintViolationException
+(400 with field-level ErrorDetail list), HttpMessageNotReadable (malformed
+JSON -> 400), type mismatch, method-not-supported (405), NoHandlerFound
+(404), MaxUploadSizeExceeded, DataIntegrityViolationException (DB constraint
+-> 409-style message, no SQL leaked), EntityNotFound, BadCredentials (401),
+Locked/Disabled account, AccessDenied (403), and a catch-all Exception -> 500
+generic message (stack trace logged, never serialized).
+Security-layer 401/403 (thrown before the DispatcherServlet) are covered by
+CustomAuthenticationEntryPoint / CustomAccessDeniedHandler emitting the same
+JSON envelope — so the error contract is uniform from filter to controller.
+
+WHAT HAPPENS WHEN...
+- DB down: Hikari exhausts (30 s connection-timeout) -> exceptions bubble to
+  the catch-all -> 500s; /actuator/health flips DOWN (DataSource health
+  indicator). No circuit breaker — every request pays the timeout.
+- Payment gateway down/timeout: exception inside PaymentServiceImpl ->
+  transaction rollback (no phantom SUCCESS), PaymentException to client. No
+  retry/backoff — client retriggers; webhook reconciliation later heals
+  status for money that actually moved. Explicit HTTP client timeouts:
+  PARTIALLY IMPLEMENTED (defaults in use — flagged in §27).
+- Email/SMS/push provider down: failures occur on async threads, logged by
+  the AsyncUncaughtExceptionHandler, user request unaffected; email_logs/
+  sms_logs/whatsapp_logs record attempts. Lost notifications are not retried.
+- Invalid request: 400 with per-field errors. Unauthorized: 401 envelope.
+- Unexpected exception: 500 with generic message; details only in logs.
+
+================================================================================
+ 19. PERFORMANCE
+================================================================================
+
+WHAT IS ALREADY DONE RIGHT (evidence in code):
+- FetchType.LAZY on every @ManyToOne (verified across entities) +
+  open-in-view=false in ALL profiles: no accidental lazy loads during JSON
+  serialization; DTO mapping happens inside the transaction.
+- Pagination enforced platform-wide (max page size 100), preventing unbounded
+  result sets.
+- 68 purposeful indexes matching the actual query patterns (appointments by
+  salon/date and employee/date — the slot engine's hot path; status columns
+  used by admin list screens; unique keys used as idempotency arbiters).
+- Read-mostly reference data cached (Caffeine 15 m) — geo/category/salon
+  discovery traffic mostly never reaches MySQL.
+- readOnly=true transactions on queries (Hibernate skips dirty checking).
+- Async offloading of all slow I/O (email/SMS/push/WhatsApp/campaign fan-out)
+  off the request thread.
+- HikariCP pool sized (20) with fail-fast timeout.
+
+KNOWN BOTTLENECKS / RISKS (be able to name these unprompted):
+1. blacklisted_tokens lookup on EVERY authenticated request
+   (JwtAuthenticationFilter -> existsByTokenId). At 1k rps that's 1k extra
+   indexed point SELECTs/s. Fix: 15-min Caffeine cache of jtis (entries are
+   immutable), or move blacklist to Redis with TTL = token remaining life.
+2. Slot computation (SlotAvailabilityServiceImpl.getAvailableSlots) loads a
+   day's appointments + schedule per request — fine per salon/day, but the
+   discovery page calling it for many salons would N+1 across salons. Cache
+   candidate keyed (salonId, date) with short TTL + eviction on booking.
+3. Potential N+1 on collection mapping (e.g. reviews -> review_images is
+   batched manually in ReviewServiceImpl via ReviewImageRepository IN-query —
+   good; but appointment -> services mapping walks per-entity). No
+   @EntityGraph/fetch-join usage — PARTIALLY addressed, worth admitting.
+4. Report/dashboard queries (AdminReportController, OwnerDashboardServiceImpl)
+   aggregate over payments/appointments at request time — no materialized
+   summaries; will degrade with data volume. Fix: nightly rollup tables.
+5. Campaign dispatch iterates recipients in one node's async pool (max 20
+   threads) — throughput ceiling for big campaigns.
+
+"TRAFFIC x10" ANSWER: first pressure point is MySQL connections (pool 20) +
+per-request blacklist SELECT; then slot queries. Order of attack: cache
+blacklist (removes ~1 query/request), raise pool cautiously, add read
+replicas for discovery/report reads, move cache+rate-limit to Redis and go
+horizontal (stateless JWT makes app scale-out trivial — the blockers are the
+LOCAL file store, in-JVM events, per-node schedulers, simple STOMP broker).
+Database scaling ladder: indexes/rollups -> read replicas -> vertical ->
+sharding by salon_id (last resort; the schema's salon-centric FKs make
+salon-id sharding feasible).
+
+================================================================================
+ 20. SCALABILITY (SUMMARY MATRIX)
+================================================================================
+
+| Concern            | Today (single node)                    | At N nodes — required change |
+|--------------------|----------------------------------------|------------------------------|
+| App statelessness  | YES (JWT, no HTTP session)             | none — LB round-robin works  |
+| Cache              | Caffeine in-heap                       | Redis (or accept 15-min divergence on reference data) |
+| Rate limiting      | Bucket4j per-JVM map                   | Redis-backed Bucket4j / gateway limiter |
+| File storage       | ./uploads local disk                   | S3/GCS + CDN (BLOCKER — files vanish per node) |
+| Domain events      | in-JVM, fire on writing node only      | broker or Redis pub/sub; Outbox for durability |
+| Schedulers         | run on every node (duplicates!)        | ShedLock / leader election / move to queue |
+| WebSocket chat     | simple broker in-heap                  | STOMP broker relay (RabbitMQ) or Redis fan-out |
+| DB                 | single MySQL                           | replicas -> shard by salon_id |
+| Sessions/auth      | JWT + DB blacklist                     | fine as-is; cache blacklist   |
+
+================================================================================
+ 21. DISTRIBUTED SYSTEM / MICROSERVICES ANALYSIS
+================================================================================
+
+This is NOT a microservice system — one process, one database, in-process
+communication. WHY THAT'S THE RIGHT CALL HERE (the interview answer):
+- The domain's core invariants are cross-module money flows (booking ->
+  payment -> transaction -> wallet/reward -> payout). In one DB these are
+  single ACID transactions; across services each becomes a saga with
+  compensation logic — enormous accidental complexity for zero current need.
+- No independent scaling requirement is proven yet; no separate teams.
+- The codebase is already PARTITIONED for extraction: every feature owns its
+  controller/service/dto/mapper package slice, modules talk through service
+  INTERFACES, and integration points are documented in code (e.g.
+  PlatformBillingService.canCreateAnotherSalon javadoc marks a cross-module
+  seam). Domain events mark the natural async boundaries.
+FIRST EXTRACTION CANDIDATES when justified: notifications (already async,
+zero transactional coupling), then search/discovery (read-only, cache-heavy),
+then payments (PCI/isolation reasons). Booking + wallet + payout should
+leave the monolith LAST because they share transactions.
+Service discovery / API gateway / circuit breakers / saga / distributed
+tracing: NOT IMPLEMENTED IN CURRENT PROJECT (not needed by this topology).
+
+================================================================================
+ 22. OBSERVABILITY
+================================================================================
+
+PRESENT:
+- Logging: SLF4J/Logback, @Slf4j across services; profile-tuned levels
+  (prod: root WARN, com.salofresh INFO; dev: DEBUG + SQL logging).
+- RequestLoggingInterceptor (registered in WebConfig): one line per request
+  "GET /api/v1/salons -> 200 (34 ms)" — poor-man's latency metric.
+- Actuator: /actuator/health (DB + diskspace indicators auto-configured,
+  details when-authorized), /actuator/info, /actuator/metrics (Micrometer
+  in-memory: JVM, Hikari pool, HTTP server timers).
+- Business audit trail: audit_logs table (all admin mutations) + login_history
+  + email/sms/whatsapp_logs + webhook_event_logs — DOMAIN observability is
+  actually strong.
+NOT IMPLEMENTED IN CURRENT PROJECT: correlation/request IDs (no MDC),
+distributed tracing, Prometheus/Grafana export, alerting, log aggregation,
+structured JSON logs.
+
+"PROD LATENCY SUDDENLY UP — DEBUG IT" (expected answer using THIS project):
+1. /actuator/health (DB up?) and /actuator/metrics/http.server.requests — find
+   which URI's timer degraded; check hikaricp.connections.pending (pool
+   starvation is the most likely culprit given pool=20 + per-request
+   blacklist query).
+2. RequestLoggingInterceptor lines: grep slow URIs, correlate start time with
+   deploy/traffic change.
+3. MySQL side: SHOW PROCESSLIST / slow query log; prime suspects: unindexed
+   report aggregations, blacklisted_tokens growth, appointments scans.
+4. JVM: /actuator/metrics jvm.memory/gc pauses; async queue depth (campaign
+   storm can saturate the 20-thread pool and Hikari).
+5. Admit the gap: without correlation IDs, cross-log tracing of one request
+   is manual — first improvement I'd ship (MDC filter, ~30 lines).
+
+================================================================================
+ 23. DEPLOYMENT & 24. CI/CD
+================================================================================
+
+FACTS: `mvn clean package` -> target/salofresh-backend.jar (spring-boot-maven
+-plugin, finalName set; Lombok excluded from the fat jar). Runtime selection
+via SPRING_PROFILES_ACTIVE (dev default; prod requires DB_HOST/DB_NAME/
+DB_USERNAME/DB_PASSWORD/JWT_SECRET env vars — datasource has NO prod
+defaults, so misconfiguration fails fast at boot). Flyway runs on startup
+(baseline-on-migrate=true) — schema migrates itself before traffic; Hibernate
+validate mode then asserts entity/schema agreement — a deploy with drifted
+schema fails at startup rather than corrupting at runtime.
+
+Dockerfile / docker-compose / Kubernetes / GitHub Actions / Jenkins: NOT
+IMPLEMENTED IN CURRENT PROJECT. There is no README either. The honest
+deployment story today: java -jar with env vars behind some external reverse
+proxy (none configured in-repo); TLS must terminate outside the app.
+
+WHAT I WOULD ADD FIRST (and can sketch in an interview): multi-stage
+Dockerfile (maven build -> eclipse-temurin:21-jre, non-root user), compose
+file with MySQL for local dev, GitHub Actions: mvn verify (the Flyway +
+context tests are real gates) -> build image -> push -> deploy; health-check
+based rolling restart; rollback = redeploy previous tag (Flyway forward-only
+migrations keep old code compatible if migrations stay additive — which
+V1..V5 are).
+
+================================================================================
+ 25. TESTING
+================================================================================
+
+WHAT EXISTS (5 classes, all green):
+1. FlywayMigrationTest — spins H2 in MySQL mode, runs all 5 migrations,
+   asserts version v5 + seeded row counts (roles/users/categories). Catches
+   SQL errors and reserved-word issues BEFORE any deploy; it caught the
+   commission_rules `value` reserved-word bug during development.
+2. SaloFreshApplicationTests — @SpringBootTest("test") full context load: all
+   70 repositories wire, security/websocket/cache config valid. It caught a
+   real Hibernate 6 bug during development (JPQL CURRENT_TIMESTAMP vs Instant
+   in ChatMessageRepository.markConversationAsRead — fixed by binding
+   :readAt Instant parameter).
+3. AuthServiceImplTest / SlotAvailabilityServiceImplTest /
+   PaymentServiceImplTest — Mockito unit tests of the three riskiest business
+   flows (lockout logic, slot math/conflict rules, signature-verify branches).
+   Notable Mockito lesson embedded: verifying
+   ApplicationEventPublisher.publishEvent requires any(Object.class) because
+   of the ApplicationEvent/Object overload pair.
+
+WHAT'S MISSING (say it before they ask): controller-layer tests
+(@WebMvcTest + spring-security-test for 401/403 matrices), repository slice
+tests (@DataJpaTest) for the conflict-detection queries, integration tests
+with Testcontainers-MySQL (H2-in-MySQL-mode is close but not identical —
+e.g. no real FULLTEXT/locking parity), and a concurrency test that would
+expose the double-booking race. Coverage tooling (JaCoCo) not configured.
+Mocking philosophy actually followed: mock repositories/gateways/publisher in
+unit tests; never mock the class under test; don't mock value objects.
+
+================================================================================
+ 26. FAILURE SCENARIOS (CURRENT BEHAVIOR -> RISK -> MITIGATION)
+================================================================================
+
+1. MySQL down — all writes/reads fail after Hikari 30 s timeouts; health
+   DOWN. Risk: total outage (by design — source of truth). Improve: circuit
+   breaker to fail fast + read-replica failover.
+2. Cache "down" — n/a (in-heap). Restart = cold cache -> brief DB spike
+   bounded by 2000-entry caches. LOW.
+3. Razorpay/Stripe down — initiate/confirm throw, transactions roll back, no
+   phantom bookings-paid. Money that moved reconciles later via webhook.
+   Improve: explicit connect/read timeouts + retry with backoff.
+4. FCM/SMTP/Twilio down — async failures logged, requests unaffected,
+   notifications lost (no retry). Improve: retry column on *_logs + scheduler
+   re-drive, or broker.
+5. Instance crash — uncommitted txns roll back cleanly; queued async events
+   LOST (no outbox); in-flight STOMP chats drop; rate-limit buckets and
+   caches reset. Booking data always consistent; side effects may be missing.
+6. Duplicate API request — see §15 (webhooks safe, payment-confirm safe,
+   booking-create NOT).
+7. Duplicate webhook event — safe: uk_webhook_event_logs_event_id +
+   existsByEventId; handler returns 200 no-op.
+8. Two users, same slot — DOUBLE BOOKING POSSIBLE (TOCTOU). Highest-priority
+   fix: unique constraint + integrity-violation catch.
+9. Two users, same wallet — safe: @Version -> second writer gets optimistic
+   lock exception (today a 500; should map to 409/retry).
+10. Deployment fails mid-migration — Flyway marks the migration failed and
+    locks; app won't start half-migrated; fix forward or flyway repair.
+    Rollback of code is safe while migrations remain additive (they are).
+11. Scheduler double-run (multi-node) — fraud detectors are dedup-guarded
+    (existsByRelatedUserIdAndTypeAndStatus); CampaignDispatchScheduler is NOT
+    -> duplicate campaign messages. Needs ShedLock before scaling out.
+12. Traffic x10 — §19: pool + blacklist query first; scale-out blocked by
+    files/events/schedulers, not by auth or app state.
+13. Stale cache — max 15 min on reference data; flags evict-on-write so
+    admin changes are immediate (single node). Acceptable by design.
+14. OTP/brute force flood — Bucket4j 429s per IP+URI; account lockout caps
+    per-account guessing; OTP max 5 attempts + 10-min expiry.
+15. Async pool exhaustion — queue 500 then RejectedExecutionException at
+    publish site (after commit — booking succeeds, side effect lost + error
+    logged). Improve: CallerRunsPolicy or queue metrics + alerting.
+
+================================================================================
+ 27. PRODUCTION READINESS / RISK REGISTER (RANKED)
+================================================================================
+
+CRITICAL
+- C1 Hardcoded fallback JWT secret in application.yml (app.jwt.secret base64
+  default). If prod runs without JWT_SECRET env, tokens are forgeable with a
+  public repo value. Fix: remove default; fail startup if absent.
+- C2 Double-booking race (no DB uniqueness/lock on slots) — revenue-facing
+  correctness bug under load. Fix: unique constraint + exception mapping.
+- C3 Seeded admin credentials (V2__seed_data.sql: admin@salofresh.com with a
+  known BCrypt hash) — must force-rotate on first prod boot.
+
+HIGH
+- H1 No durable async (no outbox/broker): crash loses stock deductions and
+  notifications silently.
+- H2 No CI/CD, no Docker, no README — unrepeatable deploys, tribal knowledge.
+- H3 Blacklist DB hit per authenticated request — latency+pool amplifier.
+- H4 /files/** fully public while KYC documents share the upload path —
+  needs authorized download endpoint for sensitive docs.
+- H5 Missing HTTP client timeouts/retries on gateway/FCM/WhatsApp calls —
+  slow third party can pin request or async threads.
+
+MEDIUM
+- M1 Optimistic-lock and generic 500s leak no info but return wrong status
+  codes (should be 409); no retry-on-conflict for wallet.
+- M2 Schedulers not cluster-safe (duplicate campaign sends at N>1).
+- M3 Rate-limit bucket map unbounded; per-node only.
+- M4 Soft-delete filtering is convention-based (…AndDeletedFalse) — one
+  missed repo method leaks "deleted" rows; a Hibernate @Where/@Filter or
+  base repo would enforce it structurally.
+- M5 Permissions catalog managed but not enforced (role checks only).
+- M6 GDPR export written to the public-ish upload dir; export URL not
+  access-controlled beyond obscurity.
+- M7 Log tables (email/sms/whatsapp/audit) unbounded growth; no archival.
+
+LOW
+- L1 No correlation IDs / JSON logs; L2 unused oauth2-resource-server dep;
+- L3 201/Location inconsistency; L4 no JaCoCo/coverage gate; L5 Swagger UI
+  exposure should be gated off in prod profile.
+
+================================================================================
+ 28. ARCHITECTURE TRADE-OFFS — "WHY THIS AND NOT ANOTHER DESIGN?"
+================================================================================
+
+1. MONOLITH vs MICROSERVICES
+   Problem: 30+ features across 3 personas sharing money-moving invariants.
+   Chosen: modular monolith. Why: single-team velocity; ACID across
+   booking/payment/wallet/payout in ONE transaction; zero infra tax.
+   Benefits: simple ops, easy refactoring, transactional integrity.
+   Costs: whole app deploys together; blast radius of a bad deploy is total;
+   can't scale features independently.
+   Alternative wins when: team > ~3 squads, or one module needs independent
+   scaling/isolation (payments for PCI). The feature-package layout was
+   chosen precisely to keep that door open.
+
+2. MySQL vs NoSQL
+   Problem: 72 interrelated tables, financial writes, multi-row invariants.
+   Chosen: MySQL/InnoDB + Flyway. Benefits: FKs, transactions, mature
+   tooling. Costs: schema migrations required; scaling is replicas-then-
+   shards. NoSQL wins when: access patterns become key-value/document-shaped
+   at massive scale (e.g. notification feed) — not the core booking domain.
+
+3. JWT (HS256, stateless) vs SERVER SESSIONS
+   Problem: mobile+web clients, future horizontal scale.
+   Chosen: 15-min access + rotating refresh + DB blacklist. Benefits: no
+   sticky sessions; revocation restored via blacklist; short TTL bounds theft
+   damage. Costs: per-request blacklist SELECT; symmetric key = any holder
+   can mint (fine while ONE service verifies).
+   Alternative (RS256/JWKS) wins when: multiple services must verify tokens
+   without sharing the signing secret. Sessions win when: instant revocation
+   with zero DB lookup matters more than statelessness (Redis session store).
+
+4. IN-JVM EVENTS vs KAFKA/RABBITMQ
+   Problem: side effects (notify, stock, waitlist) shouldn't block or fail
+   bookings. Chosen: AFTER_COMMIT async listeners. Benefits: correct
+   commit-coupling (no ghost notifications), zero infra. Costs: at-most-once,
+   node-local, lost on crash. Broker+outbox wins when: guaranteed delivery,
+   replay, or multi-instance consumers are required (first thing to change
+   when going multi-node).
+
+5. CAFFEINE vs REDIS
+   Chosen: in-process cache-aside, 15 m TTL. Benefits: sub-µs hits, no
+   network, no ops. Costs: per-node duplication and divergence at N>1.
+   Redis wins at: >1 instance, or when cache must survive restarts, or for
+   shared structures (rate limits, blacklist).
+
+6. SOFT DELETE vs HARD DELETE — chosen for audit/finance integrity; cost is
+   filter discipline + unique-key occupancy; GDPR handled via anonymization
+   on top. Hard delete wins for: nothing here except purge jobs later.
+
+7. CHECK-THEN-ACT SLOT VALIDATION vs DB-ENFORCED UNIQUENESS
+   Chosen (as implemented): rich validation in SlotAvailabilityServiceImpl
+   (explains WHY a slot is unavailable — great UX) WITHOUT a DB arbiter.
+   Cost: race window. The right end-state is BOTH: keep the validator for
+   messages, add the unique constraint as the concurrency arbiter. I present
+   this as "known debt with a designed fix", which is stronger than
+   pretending it's fine.
+
+8. MAPSTRUCT vs MANUAL MAPPING — compile-time generated mappers for the ~70
+   DTO families (fail at build, zero reflection); manual mapping kept in
+   small admin modules where a mapper class would be ceremony. Shows
+   judgment, not dogma.
+
+9. MAKER-CHECKER IN-APP vs PROCESS CONTROLS — dangerous admin actions
+   (refunds, bans, payout overrides) require a second SUPER_ADMIN via
+   approval_requests state machine with self-approval blocked in code —
+   auditable, enforceable, testable; process/policy alone is not.
+
+================================================================================
+ 29. 2-MINUTE INTERVIEW EXPLANATION (SAY THIS)
+================================================================================
+
+"SaloFresh is a salon-management SaaS backend I built as a modular monolith
+with Java 21 and Spring Boot 3.3. It serves three personas: customers who
+discover salons and book time-slots with specific staff, salon owners who run
+scheduling, inventory, payroll and marketing, and platform admins who handle
+moderation, fraud detection, support and compliance. It's about 730 Java
+files — 71 controllers with 274 REST endpoints, 70 JPA entities over 72
+MySQL tables managed by Flyway.
+
+Security is stateless JWT — 15-minute HS256 access tokens with rotating
+refresh tokens, real logout via a jti blacklist table, BCrypt-12 passwords,
+account lockout, Bucket4j rate limiting on the auth endpoints, plus Google
+OAuth2 login. Authorization is layered: role checks with @PreAuthorize down
+to per-aggregate ownership checks in services.
+
+The interesting engineering is around money and concurrency: a payment
+gateway abstraction with Razorpay and Stripe strategies, HMAC-verified
+idempotent webhooks keyed on a unique event id, a wallet with optimistic
+locking, and a maker-checker workflow where high-risk admin actions need a
+second approver — self-approval is rejected in code. Side effects like
+notifications and stock deduction run as async AFTER_COMMIT event listeners
+so a rolled-back booking never sends an email.
+
+Reference data is cached with Caffeine at 15-minute TTL. Testing includes a
+Flyway migration test, a full Spring-context test, and Mockito unit tests on
+auth, slot availability and payments — the context test actually caught a
+real Hibernate 6 timestamp bug.
+
+Known trade-offs I'd tackle next: slot booking is validate-then-insert, so
+under true concurrency a double booking is possible — the fix is a unique
+constraint on employee/date/start-time; and the in-JVM events aren't durable,
+so going multi-instance means Redis for cache and rate limiting, S3 for
+files, and an outbox with a broker for events."
+
+================================================================================
+ 30. 5-MINUTE DEEP EXPLANATION (STRUCTURE + KEY SENTENCES)
+================================================================================
+
+1. BUSINESS (30 s): marketplace + operations SaaS; platform earns via owner
+   subscription plans (Starter/Growth/Enterprise seeded in platform_plans)
+   and commission on payouts (plan % or 10% default from config).
+2. ARCHITECTURE (45 s): layered modular monolith; every feature owns a
+   vertical slice (controller/service/dto/mapper packages); modules
+   communicate via service interfaces synchronously and Spring domain events
+   asynchronously; one MySQL, Flyway-owned schema, Hibernate validate-only.
+3. REQUEST FLOW (60 s): walk FLOW 2 (create booking) from §8 end-to-end,
+   including the AFTER_COMMIT listener behavior — this is the flow to know
+   cold: filters -> @Valid -> @Transactional service -> slot validator ->
+   price+persist+event -> commit -> async notification.
+4. DATA (45 s): 72 tables; Auditable base (created/updated by/at + soft
+   delete) on everything; money spine appointments->payments->transactions->
+   refunds + wallet(+@Version) + salon_payouts; price snapshots in
+   appointment_services; enums as strings; idempotency via unique keys.
+5. SECURITY (45 s): filter chain order (rate limit -> JWT -> authz),
+   blacklist logout, lockout counters IN the users row, webhook HMAC with
+   separate secrets, STOMP CONNECT auth, maker-checker + audit_logs trail.
+6. SCALE & FAILURE (45 s): stateless app = easy horizontal, but name the
+   four single-node couplings (Caffeine, local files, in-JVM events, per-node
+   schedulers) and their replacements (Redis, S3, outbox+broker, ShedLock);
+   crash semantics: transactions roll back clean, queued side effects lost.
+7. CLOSE (10 s): "biggest known risks are the slot race and the default JWT
+   secret fallback — both have designed fixes I can walk through."
+
+================================================================================
+ 31–33. INTERVIEW QUESTIONS FROM THE ACTUAL CODE
+================================================================================
+
+BASIC
+Q: How is authentication implemented?
+A: Custom JwtAuthenticationFilter (OncePerRequestFilter) after a Bucket4j
+   rate-limit filter; JJWT HS256; claims userId/roles/tokenType/jti; blacklist
+   check; UserPrincipal into SecurityContext. Follow-up "why check tokenType?"
+   -> stops a REFRESH token being replayed as an ACCESS token.
+Q: Where are transactions defined?
+A: @Transactional on service impls only (e.g. BookingServiceImpl.createBooking,
+   line ~87); readOnly=true for queries; controllers/repositories never.
+Q: How do you validate input? -> Bean Validation on DTOs + @Valid; global
+   handler converts MethodArgumentNotValidException to field-level ErrorDetails.
+Q: What does Auditable give you? -> created/updated at/by via
+   AuditingEntityListener + AuditorAwareImpl (JWT username, else "SYSTEM"),
+   plus the is_deleted soft-delete flag inherited by ~68 entities.
+
+INTERMEDIATE
+Q: Why AFTER_COMMIT on listeners, not plain @EventListener?
+A: A synchronous listener runs INSIDE the transaction: a notification could
+   send for a booking that rolls back, and listener failure would roll back
+   the booking. AFTER_COMMIT + @Async decouples both directions.
+   Follow-up: "what does fallbackExecution=true do?" -> lets the listener
+   fire when the event was published with no active transaction (schedulers).
+Q: Why is FeatureFlagCacheLoader a separate component?
+A: @Cacheable is proxy-based AOP — self-invocation inside the same class
+   bypasses the proxy and silently disables caching; the loader forces the
+   call through a Spring proxy. (Same story for @Transactional/@Async —
+   classic trap; know it.)
+Q: How is webhook idempotency guaranteed under concurrency?
+A: Fast path existsByEventId; hard guarantee is the UNIQUE constraint
+   uk_webhook_event_logs_event_id — a concurrent duplicate insert loses with
+   a constraint violation, so exactly one processes.
+Q: How does logout actually revoke a stateless JWT?
+A: jti persisted to blacklisted_tokens; filter rejects it. Cost: DB read per
+   request; mitigation: cache jtis (immutable, short TTL).
+
+ADVANCED / SCENARIO
+Q: Two requests book the last slot simultaneously — what EXACTLY happens?
+A: Both run SlotAvailabilityServiceImpl checks under REPEATABLE READ, neither
+   sees the other's uncommitted row, both insert, both commit — double
+   booking. Fix: unique (employee_id, appointment_date, start_time) partial
+   to active statuses + map DataIntegrityViolationException to
+   SlotUnavailableException; alternatives: PESSIMISTIC_WRITE on the
+   employee-day, or SERIALIZABLE (throughput cost). Strong answer names
+   isolation level and why the read doesn't block.
+Q: Concurrent wallet top-up and debit?
+A: Wallet has @Version; second committer gets
+   ObjectOptimisticLockingFailureException; today surfaces as 500 — I'd map
+   to 409 and retry the read-modify-write once.
+Q: App crashes right after a booking commit?
+A: Booking durable; its BookingCreatedEvent side effects may be lost (in-JVM
+   queue). Outbox pattern is the fix: event row in same txn + relay poller.
+Q: Payment succeeded at Razorpay but the confirm API call never came?
+A: The webhook path heals it: POST /api/v1/webhooks/razorpay verified via
+   HMAC (separate webhook secret), reconciles still-PENDING payment to
+   SUCCESS; endpoint always 200s after logging so gateways don't retry-storm;
+   failures recorded in webhook_event_logs with status FAILED + errorMessage.
+Q: Why can a SUPER_ADMIN not approve their own refund request?
+A: ApprovalRequestServiceImpl compares requestedBy.id to the checker id and
+   throws ForbiddenException — four-eyes enforced in code, and status only
+   flips to EXECUTED after the action succeeds (failure rolls back to
+   PENDING for retry).
+
+DATABASE
+Q: Why enums as VARCHAR not ORDINAL/int? Q: Why price snapshot in
+appointment_services? Q: Why is users.password nullable? (OAuth accounts)
+Q: How does soft delete interact with the unique email constraint?
+(Deleted user still holds the email — deliberate; GDPR flow anonymizes
+nullable PII instead.) Q: Why BIGINT identity, not UUID? (§11.1)
+
+FRAMEWORK/JAVA
+Q: What do @Transactional, @Async, @Cacheable have in common? -> Spring AOP
+proxies; self-invocation bypass; needs public methods; the codebase shows
+awareness (separate cache loader bean, events for async hops).
+Q: Hibernate 6 gotcha you hit? -> JPQL `m.readAt = CURRENT_TIMESTAMP` fails
+assigning java.sql.Timestamp to an Instant field; fixed by binding an
+Instant :readAt parameter (ChatMessageRepository.markConversationAsRead).
+Q: Mockito overload trap? -> publishEvent(Object) vs
+publishEvent(ApplicationEvent): verify(...).publishEvent(any()) binds the
+wrong overload; use any(Object.class).
+
+DEVOPS/PRODUCTION
+Q: Deploy story? -> honest: fat jar + env vars + Flyway-on-boot +
+validate-mode as the schema safety net; Docker/CI are designed but NOT
+IMPLEMENTED — then sketch the pipeline (§23).
+Q: First thing you'd fix for production? -> remove the default JWT secret
+(fail-fast), add the slot unique constraint, add Dockerfile+CI.
+
+================================================================================
+ 34. CROSS-QUESTIONING (VERIFY-YOU-BUILT-IT QUESTIONS)
+================================================================================
+
+- "Why is RateLimitingFilter BEFORE the JWT filter?" -> cheapest rejection
+  first; brute-force requests shouldn't cost a JWT parse + DB blacklist hit.
+- "Why does the webhook controller return 200 even when processing fails?"
+  -> gateway retry-storm prevention; failure is recorded in
+  webhook_event_logs (status FAILED) for re-drive; only bad SIGNATURES 403.
+- "Why two different secrets for Razorpay?" -> key_secret signs API/checkout
+  values; webhook-secret signs webhook bodies — separate rotation domains.
+- "Why is commission_rules' column called rule_value?" -> VALUE is a reserved
+  word in H2/MySQL; found via FlywayMigrationTest failure; same reason
+  feature_flags uses flag_key/flag_value.
+- "Why open-in-view=false, and what breaks?" -> no lazy loading during
+  serialization; anything the DTO needs must be fetched inside the service
+  transaction — enforced by MapStruct mapping in-service.
+- "Why does AuthServiceImpl store lockout state in the DB, not memory?" ->
+  survives restarts and works across instances, unlike the rate limiter
+  (asymmetry I can defend: lockout is a security invariant, rate limiting is
+  best-effort shielding).
+- "Why didn't you use Kafka?" -> no durability/replay/multi-consumer need at
+  single-node; AFTER_COMMIT listeners give the ordering/commit-coupling that
+  matters; Outbox+broker is the planned upgrade with the event classes as
+  ready-made schemas.
+- "How do you roll back a deploy?" -> previous jar + additive-only
+  migrations; Flyway failed-migration locks startup; no automated pipeline
+  yet (admit it).
+- "What's your test that isn't a toy?" -> FlywayMigrationTest and the context
+  test are integration gates that caught two real bugs (reserved word,
+  Hibernate Instant); slot unit test encodes the overlap rules.
+
+================================================================================
+ 35. "INTERVIEWER CAN CATCH ME HERE" (BRUTALLY HONEST)
+================================================================================
+
+1. Double-booking race — if you claim slot validation "prevents" conflicts,
+   a strong interviewer will ask about concurrent inserts. UNDERSTAND: TOCTOU
+   + REPEATABLE READ non-blocking reads; ANSWER: acknowledge + unique-
+   constraint fix. Follow-up: "why doesn't REPEATABLE READ save you?" ->
+   isolation prevents dirty/non-repeatable READS, it does not make two
+   independent INSERT paths mutually exclusive.
+2. "Where is Docker/CI?" — do NOT bluff; there is none. Answer with the
+   designed pipeline and why the app is container-ready (env-driven config,
+   stateless, health endpoint).
+3. HS256 vs RS256 — know that HS256 is symmetric; anyone with the secret can
+   MINT tokens; fine for one verifier, wrong for many services.
+4. Blacklist lookup cost — if asked "isn't stateless JWT supposed to avoid DB
+   hits?", concede the trade: revocability was prioritized; caching fixes it.
+5. Caffeine at two instances — inconsistent caches; flags could differ per
+   node up to 15 min; Redis is the answer. Don't claim "distributed cache".
+6. Events durability — "what if the JVM dies post-commit?" -> side effects
+   lost; no outbox. Say it before they do.
+7. Permissions table — it's MANAGED (SUPER_ADMIN CRUD) but enforcement is
+   role-based; don't claim fine-grained permission checks exist.
+8. @Transactional internals — expect "why must it be public / what happens on
+   checked exceptions (no rollback by default) / self-invocation?" — the
+   codebase only throws RuntimeExceptions (BaseException tree), so default
+   rollback rules are safe; know WHY.
+9. "How many QPS does it handle?" — no load tests exist; give reasoning
+   (pool 20, ~N ms/query) not fake numbers; mark any estimate as assumption.
+10. Seeded admin password — if security-probed, name it yourself as a
+    controlled bootstrap credential requiring first-boot rotation.
+
+================================================================================
+ 36. WHAT I MUST MEMORIZE (FLASH CARDS)
+================================================================================
+
+ARCHITECTURE: layered modular monolith; Controller -> Service(interface+impl)
+-> Repository -> MySQL; feature-sliced packages; in-JVM AFTER_COMMIT async
+events; 1 jar, 1 DB.
+
+NUMBERS: Java 21 · Boot 3.3.4 · Hibernate 6.5.3 · JJWT 0.12.6 · 734 files ·
+71 controllers · 274 endpoints · 70 entities · 71 repos · 58 enums · 72
+tables · 5 migrations (V1 812 lines) · 68 indexes · 9 caches · 15 m TTL ·
+2000 entries · access 15 m · refresh 7/30 d · BCrypt 12 · lockout 5/30 m ·
+rate limit 20/60 s · Hikari 20 · async pool 5/20/q500 · GST 18% · default
+commission 10%.
+
+CLASSES TO NAME FLUENTLY: SecurityConfig, JwtAuthenticationFilter,
+JwtTokenProvider, TokenIssuanceService, RateLimitingFilter, UserPrincipal,
+SecurityUtils, AuditorAwareImpl, GlobalExceptionHandler, BaseException/
+ErrorCode, ApiResponse/PagedResponse, BookingServiceImpl,
+SlotAvailabilityServiceImpl, PaymentServiceImpl, PaymentGateway,
+RazorpayPaymentGatewayImpl, StripePaymentGatewayImpl,
+PaymentWebhookServiceImpl, WebhookSignatureVerifierImpl, WalletService
+(@Version Wallet), NotificationEventListener, InventoryDeductionListener,
+WaitlistNotifierListener, AsyncConfig, CacheConfig/CacheNames,
+FeatureFlagQueryService/FeatureFlagCacheLoader, AdminSalonServiceImpl,
+ApprovalRequestServiceImpl, FraudDetectionScheduler,
+DataSubjectRequestServiceImpl, SalonSpecification.
+
+TABLES TO NAME FLUENTLY: users, roles, permissions, user_roles,
+role_permissions, refresh_tokens, blacklisted_tokens, otp, login_history,
+salons, salon_owners, employees, services, categories, working_hours,
+holidays, employee_schedule/leave/attendance, appointments,
+appointment_services, payments, refunds, transactions, wallet,
+wallet_transactions, reward_points, coupons, coupon_usage, reviews,
+review_images, favorites, waitlist, membership_plans/subscriptions,
+gift_cards, family_members, chat_conversations/messages, device_tokens,
+products, stock_transactions, service_product_usage, commission_rules,
+payroll_records, marketing_campaigns, campaign_recipients, platform_plans,
+platform_subscriptions, shift_swap_requests, salon_payouts, support_tickets,
+ticket_messages, fraud_alerts, feature_flags, data_subject_requests,
+webhook_event_logs, approval_requests, audit_logs.
+
+SECURITY FLOW (one breath): CORS -> Bucket4j 429 -> JWT parse/validate ->
+tokenType==ACCESS -> jti not blacklisted -> load UserPrincipal -> permitAll
+whitelist else authenticated -> @PreAuthorize roles -> service ownership
+check -> AuditorAware stamps writes.
+
+MY RESPONSIBILITIES (truthful to the repo): full backend — schema design +
+Flyway migrations, security stack, all three feature domains, payment/webhook
+integration, async/event design, caching, tests; no frontend, no infra
+(Docker/CI not built).
+
+CHALLENGES STORY BANK: (1) reserved-word VALUE column caught by
+FlywayMigrationTest; (2) Hibernate 6 CURRENT_TIMESTAMP-vs-Instant caught by
+context test; (3) Mockito publishEvent overload; (4) designing revocable
+stateless auth (blacklist trade-off); (5) webhook idempotency by unique key;
+(6) maker-checker state machine with rollback-to-PENDING on failed execution.
+
+WEAKNESSES I VOLUNTEER: slot race, non-durable events, single-node couplings
+(Caffeine/files/schedulers/buckets), default JWT secret fallback, thin test
+pyramid top, no CI/CD.
+
+================================================================================
+ 37. ONE-PAGE CHEAT SHEET
+================================================================================
+
+Project:            SaloFresh — salon management SaaS backend (monolith)
+Business problem:   Salon discovery/booking for customers; operations suite
+                    for salon owners; moderation/compliance/monetization for
+                    the platform (subscriptions + payout commission)
+Users:              CUSTOMER, SALON_OWNER, EMPLOYEE, ADMIN, SUPER_ADMIN
+Architecture:       Layered modular monolith, feature-sliced packages,
+                    in-JVM async domain events (AFTER_COMMIT), schedulers
+Backend:            Java 21, Spring Boot 3.3.4, Spring Security 6, Data JPA/
+                    Hibernate 6.5.3, MapStruct, Lombok, springdoc OpenAPI
+Database:           MySQL 8 (InnoDB), 72 tables, Flyway V1–V5, soft delete +
+                    audit columns everywhere, H2(MySQL mode) for tests
+Cache:              Caffeine in-process, 9 caches, 15 m TTL, max 2000,
+                    cache-aside + @CacheEvict on writes
+Messaging:          NONE external — Spring events + @Async listeners
+                    (taskExecutor 5/20/500); Kafka/RabbitMQ NOT IMPLEMENTED
+Authentication:     JWT HS256 (JJWT), access 15 m + refresh 7/30 d rotation,
+                    jti blacklist logout, BCrypt(12), OTP, lockout 5→30 m,
+                    Google OAuth2; Bucket4j 20/min on /auth/**
+Authorization:      @PreAuthorize roles + in-service ownership checks;
+                    SUPER_ADMIN-only for role mgmt & maker-checker
+Main APIs:          /api/v1: auth/*, salons, salons/{id}/slots, bookings,
+                    payments/{id}/confirm, wallet, reviews, admin/* (salons,
+                    users, reviews, audit-logs, roles, approvals, fraud-
+                    alerts, feature-flags, bulk), webhooks/razorpay|stripe
+Important tables:   users, appointments, appointment_services, payments,
+                    transactions, wallet(+version), salon_payouts,
+                    webhook_event_logs(eventId UNIQUE), approval_requests,
+                    audit_logs, blacklisted_tokens
+Deployment:         fat jar (salofresh-backend.jar), env-driven profiles,
+                    Flyway on boot + ddl validate. Docker/K8s: NOT IMPLEMENTED
+CI/CD:              NOT IMPLEMENTED (tests exist as the quality gate)
+Scalability:        stateless app scales out; blockers = local files, in-JVM
+                    events, per-node schedulers/cache/limits → S3, outbox+
+                    broker, ShedLock, Redis
+Major challenge:    revocable stateless auth + payment reconciliation +
+                    concurrency correctness (wallet @Version, webhook
+                    idempotency, maker-checker)
+Major decision:     modular monolith with microservice-ready seams over
+                    premature microservices
+Biggest bottleneck: per-request blacklist SELECT + Hikari pool 20
+Known limitation:   slot booking TOCTOU race (fix: unique constraint);
+                    at-most-once side effects
+Future improvement: Docker+CI, Redis, outbox, S3, correlation IDs, JaCoCo,
+                    Testcontainers, permission-level enforcement
+
+================================================================================
+ 38. RECOMMENDED IMPROVEMENTS (PRIORITIZED BACKLOG)
+================================================================================
+1. Fail-fast on missing JWT_SECRET; delete YAML fallback. (CRITICAL, hours)
+2. UNIQUE(employee_id, appointment_date, start_time) for active bookings +
+   DataIntegrityViolation -> SlotUnavailableException. (CRITICAL, 1 day)
+3. Dockerfile + docker-compose(MySQL) + GitHub Actions mvn verify gate. (1-2 d)
+4. Cache blacklist jti lookups (Caffeine 15 m). (hours)
+5. Outbox table + relay for domain events; ShedLock on schedulers. (days)
+6. MDC correlation-id filter + JSON logs; Prometheus registry. (1 day)
+7. Authorized download endpoint for KYC docs; move uploads toward S3. (1-2 d)
+8. Map optimistic-lock & constraint violations to 409 with retry-once on
+   wallet. (hours)
+9. Testcontainers-MySQL integration suite + @WebMvcTest security matrix +
+   JaCoCo gate. (days)
+10. Enforce permissions (hasAuthority) to make role_permissions live. (days)
+
+================================================================================
+ 39. FINAL ARCHITECTURE SUMMARY & KNOWLEDGE GRAPH
+================================================================================
+
+Business requirement (3-persona salon SaaS, money movement, trust/ops)
+  -> Architecture: modular monolith (ACID across modules, 1-team velocity)
+    -> Technology: Boot 3.3.4 + MySQL + Flyway (validate-mode safety)
+      -> Code: feature-sliced layers; services own @Transactional logic;
+         events for side effects; strategies for gateways
+        -> Database: 72 audited soft-delete tables; unique keys as
+           idempotency/consistency arbiters; @Version where money races
+          -> Performance: LAZY+DTO+no-OSIV, 68 indexes, Caffeine, pagination,
+             async offload; hot spots known (blacklist SELECT, slot engine)
+            -> Scalability: stateless JWT app; single-node couplings named
+               with exact replacements (Redis/S3/outbox/ShedLock)
+              -> Failure handling: rollback-clean transactions, AFTER_COMMIT
+                 at-most-once side effects, webhook reconciliation heals
+                 payment truth, maker-checker + audit trail protect admin
+                 actions.
+
+Every arrow is a defensible interview answer: the requirement explains the
+architecture; the architecture explains the technology; the technology's
+limits explain the known debts; the debts have designed fixes.
+
+================================================================================
+ EVIDENCE / CODE REFERENCES
+================================================================================
+
+Architecture & layering:
+  src/main/java/com/salofresh/SaloFreshApplication.java
+  src/main/java/com/salofresh/controller/** , service/** , service/impl/** ,
+  repository/** , dto/** , mapper/**
+Security:
+  src/main/java/com/salofresh/security/SecurityConfig.java
+  src/main/java/com/salofresh/security/JwtAuthenticationFilter.java
+  src/main/java/com/salofresh/security/JwtTokenProvider.java
+  src/main/java/com/salofresh/filter/RateLimitingFilter.java
+  src/main/java/com/salofresh/constant/SecurityConstants.java
+  src/main/java/com/salofresh/config/PasswordEncoderConfig.java (BCrypt 12)
+  src/main/java/com/salofresh/security/StompAuthChannelInterceptor.java
+Auth data model: db/migration/V1__init_schema.sql (users, refresh_tokens,
+  blacklisted_tokens, otp, login_history) ; V2__seed_data.sql (roles/admin)
+Booking & concurrency:
+  src/main/java/com/salofresh/service/impl/booking/BookingServiceImpl.java
+  src/main/java/com/salofresh/service/impl/booking/SlotAvailabilityServiceImpl.java
+  src/main/java/com/salofresh/entity/Appointment.java
+  src/main/java/com/salofresh/entity/Wallet.java (@Version)
+Payments & webhooks:
+  src/main/java/com/salofresh/service/impl/payment/RazorpayPaymentGatewayImpl.java
+  src/main/java/com/salofresh/service/impl/payment/StripePaymentGatewayImpl.java
+  src/main/java/com/salofresh/service/impl/webhook/PaymentWebhookServiceImpl.java
+  src/main/java/com/salofresh/service/impl/webhook/WebhookSignatureVerifierImpl.java
+  src/main/java/com/salofresh/entity/WebhookEventLog.java (+ unique event_id
+  in db/migration/V5__admin_platform_features.sql)
+Events & async:
+  src/main/java/com/salofresh/config/AsyncConfig.java
+  src/main/java/com/salofresh/listener/NotificationEventListener.java
+  src/main/java/com/salofresh/listener/InventoryDeductionListener.java
+  src/main/java/com/salofresh/listener/WaitlistNotifierListener.java
+  src/main/java/com/salofresh/event/*.java
+Caching:
+  src/main/java/com/salofresh/config/CacheConfig.java
+  src/main/java/com/salofresh/constant/CacheNames.java
+  src/main/java/com/salofresh/service/impl/featureflag/FeatureFlagCacheLoader.java
+Errors: src/main/java/com/salofresh/exception/GlobalExceptionHandler.java,
+  BaseException.java, ErrorCode.java ; response/ApiResponse.java
+Auditing & soft delete:
+  src/main/java/com/salofresh/audit/Auditable.java, AuditorAwareImpl.java
+  src/main/java/com/salofresh/entity/AuditLog.java
+Admin governance:
+  src/main/java/com/salofresh/service/impl/approval/ApprovalRequestServiceImpl.java
+  src/main/java/com/salofresh/scheduler/FraudDetectionScheduler.java
+  src/main/java/com/salofresh/service/impl/gdpr/DataSubjectRequestServiceImpl.java
+Config & profiles:
+  src/main/resources/application.yml, application-dev.yml,
+  application-prod.yml (Hikari 20, ddl validate, open-in-view=false),
+  application-test.yml ; config/AppProperties.java
+Database: src/main/resources/db/migration/V1__init_schema.sql ... V5__*.sql
+Build: pom.xml
+Tests: src/test/java/com/salofresh/FlywayMigrationTest.java,
+  SaloFreshApplicationTests.java, service/auth/AuthServiceImplTest.java,
+  service/booking/SlotAvailabilityServiceImplTest.java,
+  service/payment/PaymentServiceImplTest.java
+
+======================== END OF PROJECT DEEP DIVE =============================
