@@ -1,0 +1,3667 @@
+{
+  "info": {
+    "_postman_id": "c98c55f9-cf31-43f3-b609-ba17361533d1",
+    "name": "SaloFresh \u2014 Salon Owner Journey",
+    "description": "End-to-end Postman collection covering the complete Salon Owner journey in the SaloFresh API (base path /api/v1). Folders are ordered to match a realistic journey: register/login, onboard a salon, build the service catalog, hire and schedule staff, manage day-to-day bookings, review dashboards, run payroll, manage inventory, run CRM/marketing, handle SaloFresh's own platform subscription billing, and finally review payouts/shift-swaps and support chat.\n\nPREREQUISITES:\n- The authenticated user must hold the SALON_OWNER role. This collection's '01 Auth > Register Salon Owner' request registers a brand-new user directly as SALON_OWNER via POST /auth/register/salon-owner (see RegisterSalonOwnerRequest) - there is no separate 'become an owner' upgrade step in this codebase.\n- Run 'Login' before anything else; its test script captures accessToken/refreshToken into collection variables consumed by the collection-level Bearer auth.\n- Run folders roughly in numeric order the first time through, since later folders depend on ids captured by earlier ones (salonId, serviceId, employeeId, etc.).\n- Requests marked 'Destructive - run last' soft-delete a resource that other requests in this collection still reference; run them only once you are done exercising this collection end-to-end.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "salonId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "serviceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "employeeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "scheduleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "leaveId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "commissionRuleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "payrollId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "campaignId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "couponId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "noteId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bookingId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "planId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subscriptionPaymentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "payoutId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "shiftSwapId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "cityId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "holidayId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "galleryImageId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "documentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "serviceProductUsageId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "paymentId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Auth",
+      "item": [
+        {
+          "name": "Register Salon Owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register/salon-owner",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register",
+                "salon-owner"
+              ]
+            },
+            "description": "Register a new Salon Owner account. This is the real mechanism by which a user becomes SALON_OWNER: AuthController#registerSalonOwner assigns the SALON_OWNER role directly (see RegisterSalonOwnerRequest). No separate role-upgrade step is needed. Public endpoint, no role required.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner.demo@salofresh.test\",\n  \"phone\": \"+919876543210\",\n  \"password\": \"OwnerPass@123\",\n  \"firstName\": \"Asha\",\n  \"lastName\": \"Mehta\",\n  \"businessName\": \"Glow & Glam Salon\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Log in with the salon owner's email/phone and password to obtain an access/refresh token pair. Public endpoint. Captures accessToken and refreshToken from the real LoginResponse fields (data.accessToken / data.refreshToken) into collection variables.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"owner.demo@salofresh.test\",\n  \"password\": \"OwnerPass@123\",\n  \"rememberMe\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.data.accessToken !== undefined && json.data.accessToken !== null) { pm.collectionVariables.set('accessToken', json.data.accessToken); }",
+                  "    if (json.data.refreshToken !== undefined && json.data.refreshToken !== null) { pm.collectionVariables.set('refreshToken', json.data.refreshToken); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh-token"
+              ]
+            },
+            "description": "Rotate the refresh token and obtain a new access/refresh token pair. Public endpoint (token itself is the credential). Re-captures both tokens.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.data.accessToken !== undefined && json.data.accessToken !== null) { pm.collectionVariables.set('accessToken', json.data.accessToken); }",
+                  "    if (json.data.refreshToken !== undefined && json.data.refreshToken !== null) { pm.collectionVariables.set('refreshToken', json.data.refreshToken); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get My Profile (me)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Get the currently authenticated salon owner's profile summary, including assigned roles. Requires isAuthenticated() (any logged-in user)."
+          },
+          "response": []
+        }
+      ],
+      "description": "Registration and login for the Salon Owner. Run Register once, then Login (captures accessToken/refreshToken used by every other request via collection-level bearer auth), then optionally Refresh Token."
+    },
+    {
+      "name": "02 Salon Onboarding",
+      "item": [
+        {
+          "name": "List Cities (lookup)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locations/cities?stateId=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations",
+                "cities"
+              ],
+              "query": [
+                {
+                  "key": "stateId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Public lookup of cities for a state (see also GET /locations/countries and GET /locations/states to resolve stateId); copies the first city's id into cityId, needed by Create Salon below. permitAll().",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.data && json.data.length > 0) { pm.collectionVariables.set('cityId', json.data[0].id); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Salon",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons"
+              ]
+            },
+            "description": "Create a new salon for the authenticated salon owner. Requires SALON_OWNER role. The salon is created PENDING admin verification. Captures the new salon id into salonId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Glow & Glam Salon - MG Road\",\n  \"description\": \"Premium unisex salon offering hair, skin and spa services.\",\n  \"addressLine1\": \"221 MG Road\",\n  \"addressLine2\": \"Near City Mall\",\n  \"cityId\": \"{{cityId}}\",\n  \"pinCode\": \"560001\",\n  \"latitude\": 12.9716,\n  \"longitude\": 77.5946,\n  \"googleMapUrl\": \"https://maps.google.com/?q=12.9716,77.5946\",\n  \"contactNumber\": \"+919876543210\",\n  \"whatsappNumber\": \"+919876543210\",\n  \"email\": \"mgroad@glowandglam.test\",\n  \"website\": \"https://glowandglam.test\",\n  \"openingTime\": \"09:00\",\n  \"closingTime\": \"20:00\",\n  \"parkingAvailable\": true,\n  \"wifiAvailable\": true,\n  \"acAvailable\": true,\n  \"waitingArea\": true,\n  \"kidsFriendly\": false,\n  \"wheelchairAccess\": true,\n  \"genderType\": \"UNISEX\",\n  \"gstNumber\": \"29ABCDE1234F1Z5\",\n  \"businessLicenseNumber\": \"BL-2026-00123\",\n  \"slotDurationMinutes\": 30,\n  \"bufferTimeMinutes\": 5,\n  \"maxBookingsPerSlot\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('salonId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Salon",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}"
+              ]
+            },
+            "description": "Update a salon owned by the authenticated salon owner. Requires SALON_OWNER role and ownership of {{salonId}}.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Glow & Glam Salon - MG Road (Updated)\",\n  \"description\": \"Premium unisex salon offering hair, skin and spa services. Now with keratin treatments.\",\n  \"addressLine1\": \"221 MG Road\",\n  \"addressLine2\": \"Near City Mall, 2nd Floor\",\n  \"cityId\": \"{{cityId}}\",\n  \"pinCode\": \"560001\",\n  \"latitude\": 12.9716,\n  \"longitude\": 77.5946,\n  \"googleMapUrl\": \"https://maps.google.com/?q=12.9716,77.5946\",\n  \"contactNumber\": \"+919876543210\",\n  \"whatsappNumber\": \"+919876543211\",\n  \"email\": \"mgroad@glowandglam.test\",\n  \"website\": \"https://glowandglam.test\",\n  \"openingTime\": \"09:00\",\n  \"closingTime\": \"21:00\",\n  \"parkingAvailable\": true,\n  \"wifiAvailable\": true,\n  \"acAvailable\": true,\n  \"waitingArea\": true,\n  \"kidsFriendly\": true,\n  \"wheelchairAccess\": true,\n  \"genderType\": \"UNISEX\",\n  \"gstNumber\": \"29ABCDE1234F1Z5\",\n  \"businessLicenseNumber\": \"BL-2026-00123\",\n  \"slotDurationMinutes\": 30,\n  \"bufferTimeMinutes\": 10,\n  \"maxBookingsPerSlot\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Pause Salon",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/pause",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "pause"
+              ]
+            },
+            "description": "Temporarily hide the salon from public search/booking. Requires SALON_OWNER role and ownership."
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Salon",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "activate"
+              ]
+            },
+            "description": "Re-activate a previously paused salon. Requires SALON_OWNER role and ownership."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Salon Banner",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/banner",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "banner"
+              ]
+            },
+            "description": "Upload/replace the banner image of a salon. Requires SALON_OWNER role and ownership. Multipart file field name is 'file'.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set Weekly Working Hours",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/working-hours",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "working-hours"
+              ]
+            },
+            "description": "Replace the full weekly working-hours schedule of the salon (one entry per day of week). Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"dayOfWeek\": \"MONDAY\",\n    \"open\": true,\n    \"startTime\": \"09:00\",\n    \"endTime\": \"20:00\",\n    \"breakStartTime\": \"13:00\",\n    \"breakEndTime\": \"14:00\"\n  },\n  {\n    \"dayOfWeek\": \"TUESDAY\",\n    \"open\": true,\n    \"startTime\": \"09:00\",\n    \"endTime\": \"20:00\",\n    \"breakStartTime\": \"13:00\",\n    \"breakEndTime\": \"14:00\"\n  },\n  {\n    \"dayOfWeek\": \"WEDNESDAY\",\n    \"open\": true,\n    \"startTime\": \"09:00\",\n    \"endTime\": \"20:00\",\n    \"breakStartTime\": \"13:00\",\n    \"breakEndTime\": \"14:00\"\n  },\n  {\n    \"dayOfWeek\": \"THURSDAY\",\n    \"open\": true,\n    \"startTime\": \"09:00\",\n    \"endTime\": \"20:00\",\n    \"breakStartTime\": \"13:00\",\n    \"breakEndTime\": \"14:00\"\n  },\n  {\n    \"dayOfWeek\": \"FRIDAY\",\n    \"open\": true,\n    \"startTime\": \"09:00\",\n    \"endTime\": \"20:00\",\n    \"breakStartTime\": \"13:00\",\n    \"breakEndTime\": \"14:00\"\n  },\n  {\n    \"dayOfWeek\": \"SATURDAY\",\n    \"open\": true,\n    \"startTime\": \"10:00\",\n    \"endTime\": \"21:00\"\n  },\n  {\n    \"dayOfWeek\": \"SUNDAY\",\n    \"open\": false\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Weekly Working Hours",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/working-hours",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "working-hours"
+              ]
+            },
+            "description": "List the weekly working-hours schedule of the salon. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Holiday",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/holidays",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "holidays"
+              ]
+            },
+            "description": "Add a holiday to the salon's calendar. Requires SALON_OWNER role. Captures the new holiday id into holidayId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"holidayDate\": \"2026-10-02\",\n  \"reason\": \"Gandhi Jayanti\",\n  \"recurringYearly\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('holidayId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Holidays",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/holidays",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "holidays"
+              ]
+            },
+            "description": "List holidays configured for the salon. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Holiday",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/holidays/{{holidayId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "holidays",
+                "{{holidayId}}"
+              ]
+            },
+            "description": "Update a holiday entry. Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"holidayDate\": \"2026-10-02\",\n  \"reason\": \"Gandhi Jayanti (National Holiday)\",\n  \"recurringYearly\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Holiday",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/holidays/{{holidayId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "holidays",
+                "{{holidayId}}"
+              ]
+            },
+            "description": "Remove a holiday entry. Requires SALON_OWNER role. Destructive - run after the update example above."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Gallery Image",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/gallery",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "gallery"
+              ]
+            },
+            "description": "Upload a new gallery image for the salon. Requires SALON_OWNER role. Multipart file field name is 'file'; optional 'caption' query/form param. Captures the new image id into galleryImageId.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "caption",
+                  "type": "text",
+                  "value": "Reception area"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('galleryImageId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Gallery Images",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/gallery",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "gallery"
+              ]
+            },
+            "description": "List gallery images of the salon. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Gallery Image",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/gallery/{{galleryImageId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "gallery",
+                "{{galleryImageId}}"
+              ]
+            },
+            "description": "Delete a gallery image. Requires SALON_OWNER role. Destructive - run last."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Compliance Document",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/documents?documentType=GST_CERTIFICATE",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "documents"
+              ],
+              "query": [
+                {
+                  "key": "documentType",
+                  "value": "GST_CERTIFICATE"
+                }
+              ]
+            },
+            "description": "Upload a compliance document (business license, GST certificate, etc.) for the salon. Requires SALON_OWNER role. documentType is a required query param (enum: BUSINESS_LICENSE, GST_CERTIFICATE, IDENTITY_PROOF, ADDRESS_PROOF, OTHER). Multipart file field name is 'file'. Captures the new document id into documentId.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('documentId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Documents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "documents"
+              ]
+            },
+            "description": "List documents uploaded for the salon. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Document",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/documents/{{documentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "documents",
+                "{{documentId}}"
+              ]
+            },
+            "description": "Delete a previously uploaded document. Requires SALON_OWNER role. Destructive - run last."
+          },
+          "response": []
+        },
+        {
+          "name": "List My Salons",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/owners/me/salons",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "owners",
+                "me",
+                "salons"
+              ]
+            },
+            "description": "List all salons owned by the authenticated salon owner (used for multi-branch owners). Requires SALON_OWNER role."
+          },
+          "response": []
+        }
+      ],
+      "description": "Create and configure the salon: profile, working hours, holidays, gallery, compliance documents. Run the lookup requests first to populate cityId, then Create Salon before anything else in this collection."
+    },
+    {
+      "name": "03 Services Catalog",
+      "item": [
+        {
+          "name": "List Categories (lookup)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ]
+            },
+            "description": "Public, admin-managed list of fixed service categories; copy an id into categoryId before creating a service. permitAll().",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.data && json.data.length > 0) { pm.collectionVariables.set('categoryId', json.data[0].id); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services"
+              ]
+            },
+            "description": "Create a new service offered by the salon. Requires SALON_OWNER role. Captures the new service id into serviceId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"name\": \"Classic Haircut & Styling\",\n  \"description\": \"Precision haircut with wash, blow-dry and styling.\",\n  \"durationMinutes\": 45,\n  \"price\": 599.0,\n  \"discountPrice\": 499.0,\n  \"taxPercentage\": 18.0,\n  \"imageUrl\": \"https://cdn.salofresh.test/services/haircut.jpg\",\n  \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('serviceId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Services (management view)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services?managementView=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services"
+              ],
+              "query": [
+                {
+                  "key": "managementView",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "List services for the salon. Pass managementView=true (owner only) to include INACTIVE services too. permitAll() at the endpoint level, but managementView is intended for the owning owner."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Service By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services/{{serviceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services",
+                "{{serviceId}}"
+              ]
+            },
+            "description": "Get a single service by id. permitAll()."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Service",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services/{{serviceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services",
+                "{{serviceId}}"
+              ]
+            },
+            "description": "Update an existing service. Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"name\": \"Classic Haircut & Styling (Premium)\",\n  \"description\": \"Precision haircut with wash, blow-dry, styling and scalp massage.\",\n  \"durationMinutes\": 60,\n  \"price\": 699.0,\n  \"discountPrice\": 599.0,\n  \"taxPercentage\": 18.0,\n  \"imageUrl\": \"https://cdn.salofresh.test/services/haircut.jpg\",\n  \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle Service Status",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services/{{serviceId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services",
+                "{{serviceId}}",
+                "status"
+              ]
+            },
+            "description": "Toggle a service's ACTIVE/INACTIVE status. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Service Image",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services/{{serviceId}}/image",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services",
+                "{{serviceId}}",
+                "image"
+              ]
+            },
+            "description": "Upload/replace a service's image. Requires SALON_OWNER role. Multipart file field name is 'file'.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Service",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services/{{serviceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services",
+                "{{serviceId}}"
+              ]
+            },
+            "description": "Soft-delete the service. Requires SALON_OWNER role. Destructive - run this only after every other folder in this collection that depends on {{serviceId}} (Employees' assign-services, Inventory's service-product-usage) has already been exercised."
+          },
+          "response": []
+        }
+      ],
+      "description": "Manage the salon's bookable services (category lookup, create/update/list/detail/status-toggle/image/delete)."
+    },
+    {
+      "name": "04 Employees",
+      "item": [
+        {
+          "name": "Create Employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees"
+              ]
+            },
+            "description": "Add a new employee (staff member) to the salon. Requires SALON_OWNER role. Captures the new employee id into employeeId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ritu\",\n  \"lastName\": \"Sharma\",\n  \"email\": \"ritu.sharma@glowandglam.test\",\n  \"phone\": \"+919876500011\",\n  \"designation\": \"Senior Stylist\",\n  \"joiningDate\": \"2026-01-15\",\n  \"salary\": 25000.0,\n  \"serviceIds\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('employeeId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Employees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List employees for the salon (public endpoint, also used during customer booking flows). Filters: status (EmploymentStatus), serviceId."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Employee By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}"
+              ]
+            },
+            "description": "Get employee detail (public, used during booking)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Employee",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}"
+              ]
+            },
+            "description": "Update an existing employee. Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ritu\",\n  \"lastName\": \"Sharma\",\n  \"email\": \"ritu.sharma@glowandglam.test\",\n  \"phone\": \"+919876500011\",\n  \"designation\": \"Lead Stylist\",\n  \"joiningDate\": \"2026-01-15\",\n  \"salary\": 28000.0,\n  \"serviceIds\": [\n    \"{{serviceId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Services To Employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "services"
+              ]
+            },
+            "description": "Assign services offered by the salon to an employee, so customers can book this employee for those services. Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceIds\": [\n    \"{{serviceId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Employee Photo",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/photo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "photo"
+              ]
+            },
+            "description": "Upload or replace an employee's profile photo. Requires SALON_OWNER role. Multipart file field name is 'file'.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set Employee Weekly Schedule",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/schedule",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "schedule"
+              ]
+            },
+            "description": "Upsert the weekly working schedule of an employee. Requires SALON_OWNER role. Captures the first returned day-schedule id into scheduleId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"days\": [\n    {\n      \"dayOfWeek\": \"MONDAY\",\n      \"workingDay\": true,\n      \"startTime\": \"09:00\",\n      \"endTime\": \"18:00\"\n    },\n    {\n      \"dayOfWeek\": \"TUESDAY\",\n      \"workingDay\": true,\n      \"startTime\": \"09:00\",\n      \"endTime\": \"18:00\"\n    },\n    {\n      \"dayOfWeek\": \"WEDNESDAY\",\n      \"workingDay\": true,\n      \"startTime\": \"09:00\",\n      \"endTime\": \"18:00\"\n    },\n    {\n      \"dayOfWeek\": \"THURSDAY\",\n      \"workingDay\": true,\n      \"startTime\": \"09:00\",\n      \"endTime\": \"18:00\"\n    },\n    {\n      \"dayOfWeek\": \"FRIDAY\",\n      \"workingDay\": true,\n      \"startTime\": \"09:00\",\n      \"endTime\": \"18:00\"\n    },\n    {\n      \"dayOfWeek\": \"SATURDAY\",\n      \"workingDay\": true,\n      \"startTime\": \"10:00\",\n      \"endTime\": \"19:00\"\n    },\n    {\n      \"dayOfWeek\": \"SUNDAY\",\n      \"workingDay\": false\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.data && json.data.length > 0) { pm.collectionVariables.set('scheduleId', json.data[0].id); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Employee Weekly Schedule",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/schedule",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "schedule"
+              ]
+            },
+            "description": "Get the weekly schedule of an employee (public, used during booking)."
+          },
+          "response": []
+        },
+        {
+          "name": "Request Employee Leave",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/leave",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "leave"
+              ]
+            },
+            "description": "Request leave for an employee. Requires isAuthenticated() - usable by the salon owner on behalf of staff, or by the employee's own account. Captures the new leave request id into leaveId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startDate\": \"2026-09-20\",\n  \"endDate\": \"2026-09-22\",\n  \"reason\": \"Family function\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('leaveId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Leave Requests For Employee",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/leave",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "leave"
+              ]
+            },
+            "description": "List leave requests for an employee. Requires isAuthenticated() - owner or the employee's own account."
+          },
+          "response": []
+        },
+        {
+          "name": "Approve/Reject Employee Leave",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/leave/{{leaveId}}/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "leave",
+                "{{leaveId}}",
+                "decision"
+              ]
+            },
+            "description": "Approve or reject an employee's leave request. Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approve\": true,\n  \"reason\": \"Approved, please arrange coverage.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Record Employee Attendance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/attendance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "attendance"
+              ]
+            },
+            "description": "Record check-in/check-out attendance for an employee on a given date. Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"attendanceDate\": \"2026-09-15\",\n  \"status\": \"PRESENT\",\n  \"checkIn\": \"2026-09-15T09:05:00Z\",\n  \"checkOut\": \"2026-09-15T18:10:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Employee Attendance (date range)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/attendance?startDate=2026-09-01&endDate=2026-09-30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "attendance"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-09-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-09-30"
+                }
+              ]
+            },
+            "description": "List attendance records for an employee within a date range. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Employee",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}"
+              ]
+            },
+            "description": "Soft-delete an employee. Requires SALON_OWNER role. Destructive - run this only after every other folder in this collection that depends on {{employeeId}} (Payroll, Shift Swaps) has already been exercised."
+          },
+          "response": []
+        }
+      ],
+      "description": "Manage salon staff: profiles, service assignment, weekly schedules, leave approval workflow and attendance."
+    },
+    {
+      "name": "05 Bookings Management",
+      "item": [
+        {
+          "name": "List Salon Bookings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/appointments?status=PENDING&from=2026-08-01&to=2026-12-31&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "appointments"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                },
+                {
+                  "key": "from",
+                  "value": "2026-08-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List bookings for the salon, optionally filtered by status/date range. Requires SALON_OWNER role. Captures the first booking's id into bookingId for use by the requests below."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.data && json.data.content && json.data.content.length > 0) { pm.collectionVariables.set('bookingId', json.data.content[0].id); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Booking Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appointments/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "appointments",
+                "{{bookingId}}"
+              ]
+            },
+            "description": "Get a booking by its numeric id or booking number. Requires isAuthenticated(); the underlying service enforces that only the customer or the owning salon owner may view it."
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Booking",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/appointments/{{bookingId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "appointments",
+                "{{bookingId}}",
+                "confirm"
+              ]
+            },
+            "description": "Confirm a pending booking. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Booking",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/appointments/{{bookingId}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "appointments",
+                "{{bookingId}}",
+                "complete"
+              ]
+            },
+            "description": "Mark a confirmed booking as completed. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Booking",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/appointments/{{bookingId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "appointments",
+                "{{bookingId}}",
+                "reject"
+              ]
+            },
+            "description": "Reject a pending booking, with an optional reason. Requires SALON_OWNER role. Use on a different pending booking than the one confirmed/completed above.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Requested time slot no longer available\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Booking No-Show",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/appointments/{{bookingId}}/no-show",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "appointments",
+                "{{bookingId}}",
+                "no-show"
+              ]
+            },
+            "description": "Mark a booking as a no-show. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Refund Booking Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{paymentId}}",
+                "refund"
+              ]
+            },
+            "description": "Refund a payment (full or partial) for a booking. Requires SALON_OWNER, ADMIN or SUPER_ADMIN role. Set the paymentId collection variable from the payment linked to a completed/cancelled booking (e.g. via GET /payments/my or the booking detail) before running this.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 200.0,\n  \"reason\": \"Service not completed as agreed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Salon Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/reviews?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List a salon's visible customer reviews. permitAll(); useful for the owner to find reviews to reply to. Captures the first review's id into reviewId."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.data && json.data.content && json.data.content.length > 0) { pm.collectionVariables.set('reviewId', json.data.content[0].id); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reply To Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reviews/{{reviewId}}/reply",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reviews",
+                "{{reviewId}}",
+                "reply"
+              ]
+            },
+            "description": "Post or edit the salon owner's reply to a customer review. Requires SALON_OWNER role (and ownership of the reviewed salon).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reply\": \"Thank you so much for the kind words! We look forward to seeing you again.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Salon Waitlist Demand",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/waitlist?status=WAITING&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "waitlist"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "WAITING"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List waitlist demand for the salon (customers waiting for a full slot/employee/date). Requires SALON_OWNER role."
+          },
+          "response": []
+        }
+      ],
+      "description": "Day-to-day booking operations for the owner: reviewing, confirming, completing, rejecting and marking no-show; refunds; review replies; waitlist demand."
+    },
+    {
+      "name": "06 Dashboards",
+      "item": [
+        {
+          "name": "Get Owner Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/owners/me/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "owners",
+                "me",
+                "dashboard"
+              ]
+            },
+            "description": "Get the aggregated dashboard summary (revenue, bookings, ratings, etc.) for the authenticated salon owner. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Branch Comparison",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/owners/me/dashboard/branches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "owners",
+                "me",
+                "dashboard",
+                "branches"
+              ]
+            },
+            "description": "Compare performance metrics across all branches (salons) owned by the authenticated salon owner. Requires SALON_OWNER role."
+          },
+          "response": []
+        }
+      ],
+      "description": "Owner-facing analytics: overall dashboard and multi-branch comparison."
+    },
+    {
+      "name": "07 Payroll & Commissions",
+      "item": [
+        {
+          "name": "Create Commission Rule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/commission-rules",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "commission-rules"
+              ]
+            },
+            "description": "Create a commission rule for the salon, optionally scoped to a specific employee and/or service category. Requires SALON_OWNER role. Captures the new rule id into commissionRuleId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"{{employeeId}}\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"ruleType\": \"PERCENTAGE\",\n  \"value\": 10.0,\n  \"active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('commissionRuleId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Commission Rules",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/commission-rules",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "commission-rules"
+              ]
+            },
+            "description": "List all commission rules for the salon. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Commission Rule",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/commission-rules/{{commissionRuleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "commission-rules",
+                "{{commissionRuleId}}"
+              ]
+            },
+            "description": "Update an existing commission rule. Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"{{employeeId}}\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"ruleType\": \"FLAT_PER_SERVICE\",\n  \"value\": 50.0,\n  \"active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Payroll",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/payroll/generate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "payroll",
+                "generate"
+              ]
+            },
+            "description": "Generate a DRAFT payroll record for an employee for a given period, computing commission from completed appointments. Requires SALON_OWNER role. Captures the new payroll record id into payrollId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"{{employeeId}}\",\n  \"periodStart\": \"2026-09-01\",\n  \"periodEnd\": \"2026-09-30\",\n  \"baseSalary\": 25000.0,\n  \"deductions\": 500.0,\n  \"bonus\": 1000.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('payrollId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Payroll Records",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/payroll?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "payroll"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List payroll records for the salon. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Finalize Payroll Record",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/payroll/{{payrollId}}/finalize",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "payroll",
+                "{{payrollId}}",
+                "finalize"
+              ]
+            },
+            "description": "Finalize a DRAFT payroll record, locking it from further edits. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Payroll Record Paid",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/payroll/{{payrollId}}/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "payroll",
+                "{{payrollId}}",
+                "pay"
+              ]
+            },
+            "description": "Mark a FINALIZED payroll record as PAID. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "List Employee Payroll History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employees/{{employeeId}}/payroll?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "employees",
+                "{{employeeId}}",
+                "payroll"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List payroll records for an employee. Requires SALON_OWNER or EMPLOYEE role - accessible by the employee themselves or the owning salon owner."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Commission Rule",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/commission-rules/{{commissionRuleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "commission-rules",
+                "{{commissionRuleId}}"
+              ]
+            },
+            "description": "Delete a commission rule. Requires SALON_OWNER role. Destructive - run last, after payroll generation above."
+          },
+          "response": []
+        }
+      ],
+      "description": "Configure staff commission rules and run the payroll lifecycle: generate, finalize, pay."
+    },
+    {
+      "name": "08 Inventory",
+      "item": [
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "products"
+              ]
+            },
+            "description": "Add a new product to the salon's inventory. Requires SALON_OWNER role. Captures the new product id into productId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Keratin Shampoo 250ml\",\n  \"sku\": \"KRT-SHM-250\",\n  \"unit\": \"bottle\",\n  \"reorderLevel\": 5,\n  \"costPrice\": 220.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('productId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "products"
+              ]
+            },
+            "description": "List active products for the salon. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "List Low Stock Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/products/low-stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "products",
+                "low-stock"
+              ]
+            },
+            "description": "List products currently at or below their reorder level. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "Get a single product. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "Update a product. Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Keratin Shampoo 250ml\",\n  \"sku\": \"KRT-SHM-250\",\n  \"unit\": \"bottle\",\n  \"reorderLevel\": 8,\n  \"costPrice\": 235.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Record Stock-In",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/products/{{productId}}/stock-adjustments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "products",
+                "{{productId}}",
+                "stock-adjustments"
+              ]
+            },
+            "description": "Record a manual stock movement. type=STOCK_IN with a positive quantity increases stock. Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"STOCK_IN\",\n  \"quantity\": 50,\n  \"reason\": \"New supplier delivery\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Record Stock-Out",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/products/{{productId}}/stock-adjustments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "products",
+                "{{productId}}",
+                "stock-adjustments"
+              ]
+            },
+            "description": "Record a manual stock movement. type=STOCK_OUT with a positive quantity decreases stock (clamped at 0). Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"STOCK_OUT\",\n  \"quantity\": 5,\n  \"reason\": \"Used in-salon for client services\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Stock Transactions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/products/{{productId}}/stock-transactions?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "products",
+                "{{productId}}",
+                "stock-transactions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Paginated stock transaction history for a product, most recent first. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Link Product To Service (Usage)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services/{{serviceId}}/product-usage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services",
+                "{{serviceId}}",
+                "product-usage"
+              ]
+            },
+            "description": "Link a product to a service with a per-service consumption quantity, so stock is auto-tracked as the service is delivered. Requires SALON_OWNER role. Captures the new link id into serviceProductUsageId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantityPerService\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('serviceProductUsageId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Product Usage For Service",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services/{{serviceId}}/product-usage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services",
+                "{{serviceId}}",
+                "product-usage"
+              ]
+            },
+            "description": "List product usage links configured for a service. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Unlink Product From Service",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/services/{{serviceId}}/product-usage/{{serviceProductUsageId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "services",
+                "{{serviceId}}",
+                "product-usage",
+                "{{serviceProductUsageId}}"
+              ]
+            },
+            "description": "Unlink a product from a service. Requires SALON_OWNER role. Destructive - run last."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "Soft-delete a product. Requires SALON_OWNER role. Destructive - run last, after the service-product-usage requests above."
+          },
+          "response": []
+        }
+      ],
+      "description": "Product catalog, stock-in/out transactions, low-stock visibility and service-to-product consumption mapping."
+    },
+    {
+      "name": "09 CRM & Marketing",
+      "item": [
+        {
+          "name": "Create Customer Note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/customers/{{customerId}}/notes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "customers",
+                "{{customerId}}",
+                "notes"
+              ]
+            },
+            "description": "Add a private CRM note about a customer of this salon (never shown to the customer). Requires SALON_OWNER role. Set customerId to a real customer id (e.g. from a booking's customer) first. Captures the new note id into noteId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Prefers ammonia-free hair color; allergic to certain fragrances.\",\n  \"tag\": \"ALLERGY_ALERT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('noteId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Customer Notes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/customers/{{customerId}}/notes?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "customers",
+                "{{customerId}}",
+                "notes"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List CRM notes for a customer of this salon, most recent first. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Customer Note",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/customers/{{customerId}}/notes/{{noteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "customers",
+                "{{customerId}}",
+                "notes",
+                "{{noteId}}"
+              ]
+            },
+            "description": "Update a CRM note (original author or salon owner only). Requires SALON_OWNER role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Prefers ammonia-free hair color; allergic to certain fragrances. VIP client - always offer complimentary head massage.\",\n  \"tag\": \"VIP\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Customer 360 Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/customers/{{customerId}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "customers",
+                "{{customerId}}",
+                "profile"
+              ]
+            },
+            "description": "Get the aggregated CRM profile (customer 360: visit history, spend, notes) for a customer at this salon. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Customer Note",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/customers/{{customerId}}/notes/{{noteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "customers",
+                "{{customerId}}",
+                "notes",
+                "{{noteId}}"
+              ]
+            },
+            "description": "Soft delete a CRM note (salon owner only). Requires SALON_OWNER role. Destructive - run last."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Marketing Campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "campaigns"
+              ]
+            },
+            "description": "Create a new marketing campaign for the salon, resolving the target audience into a customer list. Requires SALON_OWNER role. Leave scheduledAt null to dispatch immediately, or set a future instant to schedule it. Captures the new campaign id into campaignId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Festive Season Offer\",\n  \"message\": \"Get 20% off on all hair color services this festive season. Book now!\",\n  \"channel\": \"SMS\",\n  \"targetAudience\": \"ALL_CUSTOMERS\",\n  \"customCustomerIds\": null,\n  \"scheduledAt\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('campaignId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Marketing Campaigns",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/campaigns?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "campaigns"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List marketing campaigns for the salon. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Marketing Campaign By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/campaigns/{{campaignId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "campaigns",
+                "{{campaignId}}"
+              ]
+            },
+            "description": "Get a marketing campaign by id, including recipient counts. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Send Marketing Campaign Now",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/campaigns/{{campaignId}}/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "campaigns",
+                "{{campaignId}}",
+                "send"
+              ]
+            },
+            "description": "Send a DRAFT or SCHEDULED campaign immediately. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "List Campaign Recipients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/campaigns/{{campaignId}}/recipients?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "campaigns",
+                "{{campaignId}}",
+                "recipients"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List the recipients of a marketing campaign. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Marketing Campaign",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/campaigns/{{campaignId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "campaigns",
+                "{{campaignId}}",
+                "cancel"
+              ]
+            },
+            "description": "Cancel a DRAFT or SCHEDULED campaign. Requires SALON_OWNER role. Only valid on a campaign that has not already been sent - create a separate campaign to try this if you already ran 'Send Marketing Campaign Now'."
+          },
+          "response": []
+        }
+      ],
+      "description": "Private staff-facing customer notes/360 profile, and salon-owner marketing campaign broadcasts."
+    },
+    {
+      "name": "10 Platform Billing",
+      "item": [
+        {
+          "name": "List Platform Plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/platform-billing/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "platform-billing",
+                "plans"
+              ]
+            },
+            "description": "List the active platform subscription plans available for salon owners to subscribe to. Public endpoint. Captures the first plan's id into planId.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.data && json.data.length > 0) { pm.collectionVariables.set('planId', json.data[0].id); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subscribe To Platform Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/platform-billing/subscribe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "platform-billing",
+                "subscribe"
+              ]
+            },
+            "description": "Subscribe to a platform plan. Creates a payment for the selected plan; CASH/WALLET payments are finalized immediately, gateway methods return details needed to confirm. Requires SALON_OWNER role. Captures the resulting payment id into subscriptionPaymentId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planId}}\",\n  \"paymentMethod\": \"CASH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.paymentId;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('subscriptionPaymentId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm Platform Subscription Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/platform-billing/{{subscriptionPaymentId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "platform-billing",
+                "{{subscriptionPaymentId}}",
+                "confirm"
+              ]
+            },
+            "description": "Confirm/capture a platform plan subscription payment and activate the subscription. Requires SALON_OWNER role. gatewayPaymentId/gatewaySignature are ignored for CASH payments.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gatewayPaymentId\": null,\n  \"gatewaySignature\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Active Subscription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/platform-billing/my-subscription",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "platform-billing",
+                "my-subscription"
+              ]
+            },
+            "description": "Get the current owner's active platform subscription, if any. Requires SALON_OWNER role."
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Subscription History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/platform-billing/my-subscription/history?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "platform-billing",
+                "my-subscription",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List the current owner's platform subscription purchase history. Requires SALON_OWNER role."
+          },
+          "response": []
+        }
+      ],
+      "description": "SaloFresh's own subscription billing charged to the salon owner for using the platform (distinct from the salon's customer-facing membership plans in folder 03)."
+    },
+    {
+      "name": "11 Payouts & Shift Swaps",
+      "item": [
+        {
+          "name": "List Salon Payouts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/payouts?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "payouts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List settlement payouts for the salon. Requires isAuthenticated(); the service layer restricts owners to their own salon (admins can view any salon). Payouts are generated by platform admins (see the separate Admin collection) - this list may be empty until then. Captures the first payout's id into payoutId."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.data && json.data.content && json.data.content.length > 0) { pm.collectionVariables.set('payoutId', json.data.content[0].id); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Salon Payout By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/payouts/{{payoutId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "payouts",
+                "{{payoutId}}"
+              ]
+            },
+            "description": "Get a single payout by id (own salon for owners, any salon for admins). Requires isAuthenticated()."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Shift Swap Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/shift-swaps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "shift-swaps"
+              ]
+            },
+            "description": "Request a shift swap for an employee. Requires isAuthenticated() - usable by the employee's own account OR the salon owner on their behalf. Captures the new request id into shiftSwapId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shiftDate\": \"2026-09-18\",\n  \"originalStartTime\": \"09:00\",\n  \"originalEndTime\": \"17:00\",\n  \"targetEmployeeId\": null,\n  \"reason\": \"Personal appointment\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    var json = pm.response.json();",
+                  "    var val = json.data.id;",
+                  "    if (val !== undefined && val !== null) {",
+                  "        pm.collectionVariables.set('shiftSwapId', val);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Shift Swap Requests For Employee",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/shift-swaps?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "shift-swaps"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List shift-swap requests raised by an employee. Requires isAuthenticated() - the employee's own account or the salon owner."
+          },
+          "response": []
+        },
+        {
+          "name": "List Shift Swap Requests For Salon",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/shift-swaps?status=PENDING&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "shift-swaps"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List all shift-swap requests for the salon, optionally filtered by status. Requires isAuthenticated(); in practice this salon-wide view is used by the salon owner."
+          },
+          "response": []
+        },
+        {
+          "name": "Approve/Reject Shift Swap",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/shift-swaps/{{shiftSwapId}}/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "shift-swaps",
+                "{{shiftSwapId}}",
+                "decision"
+              ]
+            },
+            "description": "Approve or reject a pending shift-swap request. Requires isAuthenticated(); in practice this decision is made by the salon owner. NOTE: approving does not automatically rewrite the employee's schedule - it is a coordination/visibility tool only.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approve\": true,\n  \"note\": \"Approved - please arrange informal coverage with the team.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Shift Swap Request",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salons/{{salonId}}/employees/{{employeeId}}/shift-swaps/{{shiftSwapId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salons",
+                "{{salonId}}",
+                "employees",
+                "{{employeeId}}",
+                "shift-swaps",
+                "{{shiftSwapId}}"
+              ]
+            },
+            "description": "Cancel a still-pending shift-swap request. Requires isAuthenticated() - the requesting employee's own account or the salon owner. Only valid while still PENDING - do not run after the approve/reject decision above on the same id; use it on a freshly created request instead."
+          },
+          "response": []
+        }
+      ],
+      "description": "Read-only visibility into salon settlement payouts, plus the staff shift-swap coordination workflow (owner approves/rejects; either the owner or the employee may create/cancel a request)."
+    }
+  ]
+}
